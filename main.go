@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
+	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -30,6 +34,21 @@ var (
 
 	infoStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#04B575"))
+
+	menuStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#874BFD")).
+			Padding(1, 2).
+			Background(lipgloss.Color("#1a1a1a"))
+
+	selectedMenuStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("#874BFD")).
+				Foreground(lipgloss.Color("#FFFDF5")).
+				Padding(0, 1)
+
+	successStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#04B575")).
+			Bold(true)
 )
 
 // App states
@@ -39,6 +58,7 @@ const (
 	stateTokenInput state = iota
 	stateLoading
 	stateResourceView
+	stateContextMenu
 	stateError
 )
 
@@ -113,6 +133,18 @@ const (
 
 var resourceTabs = []string{"Servers", "Networks", "Load Balancers", "Volumes"}
 
+// Context menu items
+type contextMenuItem struct {
+	label  string
+	action string
+}
+
+type contextMenu struct {
+	items        []contextMenuItem
+	selectedItem int
+	server       *hcloud.Server
+}
+
 // List items for different resources
 type serverItem struct {
 	server *hcloud.Server
@@ -175,10 +207,12 @@ type model struct {
 	client          *hcloud.Client
 	activeTab       resourceType
 	lists           map[resourceType]list.Model
+	contextMenu     contextMenu
 	help            help.Model
 	err             error
 	width           int
 	height          int
+	statusMessage   string
 }
 
 // Messages
@@ -194,6 +228,12 @@ type errorMsg struct {
 }
 
 func (e errorMsg) Error() string { return e.err.Error() }
+
+type statusMsg string
+
+type sshLaunchedMsg struct{}
+
+type clipboardCopiedMsg string
 
 // Commands
 func loadResources(client *hcloud.Client) tea.Cmd {
@@ -227,6 +267,68 @@ func loadResources(client *hcloud.Client) tea.Cmd {
 			volumes:       volumes,
 		}
 	}
+}
+
+func copyToClipboard(text string) tea.Cmd {
+	return func() tea.Msg {
+		err := clipboard.WriteAll(text)
+		if err != nil {
+			return errorMsg{err}
+		}
+		return clipboardCopiedMsg(text)
+	}
+}
+
+func launchSSH(ip string) tea.Cmd {
+	return func() tea.Msg {
+		var cmd *exec.Cmd
+		
+		// Determine terminal based on OS
+		switch runtime.GOOS {
+		case "darwin": // macOS
+			cmd = exec.Command("osascript", "-e", fmt.Sprintf(`tell application "Terminal" to do script "ssh root@%s"`, ip))
+		case "linux":
+			// Try common terminal emulators
+			terminals := []string{"gnome-terminal", "konsole", "xterm", "alacritty", "kitty"}
+			for _, term := range terminals {
+				if _, err := exec.LookPath(term); err == nil {
+					switch term {
+					case "gnome-terminal":
+						cmd = exec.Command(term, "--", "ssh", fmt.Sprintf("root@%s", ip))
+					case "konsole":
+						cmd = exec.Command(term, "-e", "ssh", fmt.Sprintf("root@%s", ip))
+					default:
+						cmd = exec.Command(term, "-e", "ssh", fmt.Sprintf("root@%s", ip))
+					}
+					break
+				}
+			}
+		case "windows":
+			// Use Windows Terminal if available, otherwise cmd
+			if _, err := exec.LookPath("wt"); err == nil {
+				cmd = exec.Command("wt", "ssh", fmt.Sprintf("root@%s", ip))
+			} else {
+				cmd = exec.Command("cmd", "/c", "start", "ssh", fmt.Sprintf("root@%s", ip))
+			}
+		}
+		
+		if cmd == nil {
+			return errorMsg{fmt.Errorf("no suitable terminal found")}
+		}
+		
+		err := cmd.Start()
+		if err != nil {
+			return errorMsg{err}
+		}
+		
+		return sshLaunchedMsg{}
+	}
+}
+
+func clearStatusMessage() tea.Cmd {
+	return tea.Tick(time.Second*3, func(t time.Time) tea.Msg {
+		return statusMsg("")
+	})
 }
 
 func initialModel() model {
@@ -284,6 +386,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			
 		case stateResourceView:
 			switch {
+			case key.Matches(msg, keys.Enter):
+				// Show context menu for servers
+				if m.activeTab == resourceServers {
+					if currentList, exists := m.lists[resourceServers]; exists {
+						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
+							if serverItem, ok := selectedItem.(serverItem); ok {
+								m.contextMenu = contextMenu{
+									items: []contextMenuItem{
+										{label: "📋 Copy Public IP", action: "copy_public_ip"},
+										{label: "📋 Copy Private IP", action: "copy_private_ip"},
+										{label: "🔗 SSH (New Terminal)", action: "ssh_new_terminal"},
+										{label: "🔗 SSH (Current Terminal)", action: "ssh_current_terminal"},
+										{label: "❌ Cancel", action: "cancel"},
+									},
+									selectedItem: 0,
+									server:       serverItem.server,
+								}
+								m.state = stateContextMenu
+							}
+						}
+					}
+				}
+				
 			case key.Matches(msg, keys.Tab):
 				m.activeTab = (m.activeTab + 1) % resourceType(len(resourceTabs))
 				
@@ -299,6 +424,52 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				
 			case key.Matches(msg, keys.Quit):
 				return m, tea.Quit
+			}
+			
+		case stateContextMenu:
+			switch {
+			case key.Matches(msg, keys.Up):
+				if m.contextMenu.selectedItem > 0 {
+					m.contextMenu.selectedItem--
+				}
+				
+			case key.Matches(msg, keys.Down):
+				if m.contextMenu.selectedItem < len(m.contextMenu.items)-1 {
+					m.contextMenu.selectedItem++
+				}
+				
+			case key.Matches(msg, keys.Enter):
+				selectedAction := m.contextMenu.items[m.contextMenu.selectedItem].action
+				server := m.contextMenu.server
+				m.state = stateResourceView
+				
+				switch selectedAction {
+				case "copy_public_ip":
+					if server.PublicNet.IPv4.IP != nil {
+						return m, copyToClipboard(server.PublicNet.IPv4.IP.String())
+					}
+				case "copy_private_ip":
+					if len(server.PrivateNet) > 0 && server.PrivateNet[0].IP != nil {
+						return m, copyToClipboard(server.PrivateNet[0].IP.String())
+					}
+				case "ssh_new_terminal":
+					if server.PublicNet.IPv4.IP != nil {
+						return m, launchSSH(server.PublicNet.IPv4.IP.String())
+					}
+				case "ssh_current_terminal":
+					if server.PublicNet.IPv4.IP != nil {
+						// Suspend TUI and run SSH in current terminal
+						return m, tea.ExecProcess(exec.Command("ssh", fmt.Sprintf("root@%s", server.PublicNet.IPv4.IP.String())), func(err error) tea.Msg {
+							if err != nil {
+								return errorMsg{err}
+							}
+							return sshLaunchedMsg{}
+						})
+					}
+				}
+				
+			case key.Matches(msg, keys.Quit):
+				m.state = stateResourceView
 			}
 			
 		case stateError:
@@ -347,6 +518,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		volumesList := list.New(volumeItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		volumesList.Title = "Volumes"
 		m.lists[resourceVolumes] = volumesList
+		
+	case clipboardCopiedMsg:
+		m.statusMessage = fmt.Sprintf("✅ Copied %s to clipboard", string(msg))
+		return m, clearStatusMessage()
+		
+	case sshLaunchedMsg:
+		m.statusMessage = "🚀 SSH session launched"
+		return m, clearStatusMessage()
+		
+	case statusMsg:
+		m.statusMessage = string(msg)
 		
 	case errorMsg:
 		m.state = stateError
@@ -406,12 +588,67 @@ func (m model) View() string {
 			listView = currentList.View()
 		}
 		
+		// Status message
+		statusView := ""
+		if m.statusMessage != "" {
+			statusView = "\n" + successStyle.Render(m.statusMessage)
+		}
+		
+		helpText := "Tab: switch view • ←/→: navigate tabs • Enter: actions • q: quit"
+		if m.activeTab == resourceServers {
+			helpText = "Tab: switch view • ←/→: navigate tabs • Enter: server actions • q: quit"
+		}
+		
 		return fmt.Sprintf(
-			"%s\n\n%s\n\n%s",
+			"%s\n\n%s%s\n\n%s",
 			tabsView,
 			listView,
-			helpStyle.Render("Tab: switch view • ←/→: navigate tabs • q: quit"),
+			statusView,
+			helpStyle.Render(helpText),
 		)
+		
+	case stateContextMenu:
+		// Render the current resource view in background
+		var tabs []string
+		for i, tab := range resourceTabs {
+			if resourceType(i) == m.activeTab {
+				tabs = append(tabs, titleStyle.Render(tab))
+			} else {
+				tabs = append(tabs, helpStyle.Render(tab))
+			}
+		}
+		tabsView := strings.Join(tabs, " ")
+		
+		var listView string
+		if currentList, exists := m.lists[m.activeTab]; exists {
+			listView = currentList.View()
+		}
+		
+		// Render context menu
+		var menuItems []string
+		for i, item := range m.contextMenu.items {
+			if i == m.contextMenu.selectedItem {
+				menuItems = append(menuItems, selectedMenuStyle.Render(item.label))
+			} else {
+				menuItems = append(menuItems, item.label)
+			}
+		}
+		
+		menuContent := strings.Join(menuItems, "\n")
+		menu := menuStyle.Render(fmt.Sprintf("Actions for %s:\n\n%s", m.contextMenu.server.Name, menuContent))
+		
+		// Center the menu
+		menuHeight := strings.Count(menu, "\n") + 1
+		menuWidth := 40 // Approximate width
+		_ = menuHeight  // Suppress unused variable warning
+		_ = menuWidth   // Suppress unused variable warning
+		
+		// Position menu overlay
+		menuOverlay := lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, menu)
+		
+		background := fmt.Sprintf("%s\n\n%s", tabsView, listView)
+		
+		return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, background) + menuOverlay
 		
 	case stateError:
 		return fmt.Sprintf(
