@@ -497,7 +497,7 @@ func launchSSH(ip string) tea.Cmd {
 			cmd = exec.Command("osascript", "-e", fmt.Sprintf(`tell application "Terminal" to do script "ssh root@%s"`, ip))
 		case "linux":
 			// Try common terminal emulators
-			terminals := []string{"gnome-terminal", "konsole", "xterm", "alacritty", "kitty"}
+			terminals := []string{"gnome-terminal", "konsole", "xterm", "alacritty", "kitty", "foot"}
 			for _, term := range terminals {
 				if _, err := exec.LookPath(term); err == nil {
 					switch term {
