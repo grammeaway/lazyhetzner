@@ -1,5 +1,28 @@
 # lazyhetzner
-A TUI for managing Hetzner Cloud servers with ease.
+A TUI for managing Hetzner Cloud servers with ease. Written in Golang, using Bubble Tea for the terminal user interface, and the hcloud Go client for interacting with the Hetzner Cloud API.
+
+
+## Build from Source
+To build lazyhetzner from source, you need to have Go installed on your system. Follow these steps:
+1. Clone the repository:
+   ```bash
+   git clone foobar/lazyhetzner.git
+    cd lazyhetzner
+    ```
+
+2. Build the project:
+    ```bash
+    go build -o lazyhetzner
+    ```
+3. Make the binary executable:
+    ```bash
+    chmod +x lazyhetzner
+    ```
+4. Move the binary to a directory in your PATH:
+    ```bash
+    sudo mv lazyhetzner /usr/local/bin/
+    ```
+
 
 
 ## Persisting and Managing Multiple Projects
