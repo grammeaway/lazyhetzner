@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -477,6 +478,66 @@ func loadResources(client *hcloud.Client) tea.Cmd {
 	}
 }
 
+func getResourceLabels(client *hcloud.Client, resourceType resourceType, resourceID int) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		
+		var labels map[string]string
+		
+		switch resourceType {
+		case resourceServers:
+			server, _, err := client.Server.Get(ctx, strconv.Itoa(resourceID))
+			if err != nil {
+				return errorMsg{err}
+			}
+			if server == nil {
+				return errorMsg{fmt.Errorf("server with ID %d not found",strconv.Itoa(resourceID))}
+			}
+			labels = server.Labels
+			
+		case resourceNetworks:
+			network, _, err := client.Network.Get(ctx, strconv.Itoa(resourceID))
+			if err != nil {
+				return errorMsg{err}
+			}
+			if network == nil {
+				return errorMsg{fmt.Errorf("network with ID %d not found", resourceID)}
+			}
+			labels = network.Labels
+			
+		case resourceLoadBalancers:
+			lb, _, err := client.LoadBalancer.Get(ctx, strconv.Itoa(resourceID))
+			if err != nil {
+				return errorMsg{err}
+			}
+			if lb == nil {
+				return errorMsg{fmt.Errorf("load balancer with ID %d not found", resourceID)}
+			}
+			labels = lb.Labels
+			
+		case resourceVolumes:
+			volume, _, err := client.Volume.Get(ctx, strconv.Itoa(resourceID))
+			if err != nil {
+				return errorMsg{err}
+			}
+			if volume == nil {
+				return errorMsg{fmt.Errorf("volume with ID %d not found", resourceID)}
+			}
+			labels = volume.Labels
+			
+		default:
+			return errorMsg{fmt.Errorf("unknown resource type: %d", resourceType)}
+		}
+		
+		labelList := make([]string, 0, len(labels))
+		for k, v := range labels {
+			labelList = append(labelList, fmt.Sprintf("%s: %s", k, v))
+		}
+		
+		return statusMsg(fmt.Sprintf("Labels for resource ID %d:\n%s", resourceID, strings.Join(labelList, "\n")))
+	}
+}
+
 func copyToClipboard(text string) tea.Cmd {
 	return func() tea.Msg {
 		err := clipboard.WriteAll(text)
@@ -512,11 +573,14 @@ func launchSSH(ip string) tea.Cmd {
 				}
 			}
 		case "windows":
-			// Use Windows Terminal if available, otherwise cmd
+			// Use Windows Terminal if available, fallback to Powershell, otherwise cmd
 			if _, err := exec.LookPath("wt"); err == nil {
 				cmd = exec.Command("wt", "ssh", fmt.Sprintf("root@%s", ip))
+
+			} else if _, err := exec.LookPath("powershell"); err == nil {
+				cmd = exec.Command("powershell", "-Command", fmt.Sprintf("ssh root@%s", ip))
 			} else {
-				cmd = exec.Command("cmd", "/c", "start", "ssh", fmt.Sprintf("root@%s", ip))
+				cmd = exec.Command("cmd", "/C", fmt.Sprintf("ssh root@%s", ip))
 			}
 		}
 		
@@ -709,6 +773,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 										{label: "📋 Copy Private IP", action: "copy_private_ip"},
 										{label: "🔗 SSH (New Terminal)", action: "ssh_new_terminal"},
 										{label: "🔗 SSH (Current Terminal)", action: "ssh_current_terminal"},
+										{label: "🏷️ Show Labels", action: "show_labels"},
 										{label: "❌ Cancel", action: "cancel"},
 									},
 									selectedItem: 0,
@@ -758,6 +823,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "copy_public_ip":
 					if server.PublicNet.IPv4.IP != nil {
 						return m, copyToClipboard(server.PublicNet.IPv4.IP.String())
+					}
+				case "show_labels":
+					if server.ID != 0 {
+						return m, getResourceLabels(m.client, resourceServers, server.ID)
 					}
 				case "copy_private_ip":
 					if len(server.PrivateNet) > 0 && server.PrivateNet[0].IP != nil {
