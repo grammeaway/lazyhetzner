@@ -955,7 +955,7 @@ func (m model) View() string {
 		if m.config == nil {
 			return fmt.Sprintf(
 				"\n%s\n\n%s\n",
-				titleStyle.Render("Hetzner Cloud TUI"),
+				titleStyle.Render("lazyhetzner"),
 				infoStyle.Render("Loading configuration..."),
 			)
 		}
@@ -963,7 +963,7 @@ func (m model) View() string {
 		if len(m.config.Projects) == 0 {
 			return fmt.Sprintf(
 				"\n%s\n\n%s\n\n%s\n",
-				titleStyle.Render("Hetzner Cloud TUI"),
+				titleStyle.Render("lazyhetzner"),
 				warningStyle.Render("No projects configured yet."),
 				helpStyle.Render("Press 'a' to add your first project • Press q to quit"),
 			)
@@ -977,7 +977,7 @@ func (m model) View() string {
 		
 		return fmt.Sprintf(
 			"\n%s\n\n%s%s\n\n%s\n",
-			titleStyle.Render("Hetzner Cloud TUI"),
+			titleStyle.Render("lazyhetzner"),
 			m.projectList.View(),
 			statusView,
 			helpStyle.Render("Enter: select project • a: add project • d: delete project • q: quit"),
@@ -1007,14 +1007,14 @@ func (m model) View() string {
 		
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n",
-			titleStyle.Render("Hetzner Cloud TUI - Add Project"),
+			titleStyle.Render("lazyhetzner - Add Project"),
 			formView.String(),
 		)
 		
 	case stateTokenInput:
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n\n%s\n\n%s\n",
-			titleStyle.Render("Hetzner Cloud TUI"),
+			titleStyle.Render("lazyhetzner"),
 			infoStyle.Render("Enter API token for one-time access:"),
 			m.tokenInput.View(),
 			helpStyle.Render("Press Enter to continue • Press q to go back"),
@@ -1023,7 +1023,7 @@ func (m model) View() string {
 	case stateLoading:
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n",
-			titleStyle.Render("Hetzner Cloud TUI"),
+			titleStyle.Render("lazyhetzner"),
 			infoStyle.Render("Loading resources..."),
 		)
 		
@@ -1122,7 +1122,7 @@ func (m model) View() string {
 	case stateError:
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n\n%s\n",
-			titleStyle.Render("Hetzner Cloud TUI - Error"),
+			titleStyle.Render("lazyhetzner - Error"),
 			errorStyle.Render(fmt.Sprintf("Error: %v", m.err)),
 			helpStyle.Render("Press q to quit"),
 		)
