@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -18,6 +20,108 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/hetznercloud/hcloud-go/hcloud"
 )
+
+// Config management
+type ProjectConfig struct {
+	Name  string `json:"name"`
+	Token string `json:"token"`
+}
+
+type Config struct {
+	Projects       []ProjectConfig `json:"projects"`
+	DefaultProject string          `json:"default_project"`
+}
+
+func getConfigPath() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	
+	configDir := filepath.Join(homeDir, ".config", "lazyhetzner")
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return "", err
+	}
+	
+	return filepath.Join(configDir, "config.json"), nil
+}
+
+func loadConfig() (*Config, error) {
+	configPath, err := getConfigPath()
+	if err != nil {
+		return &Config{Projects: []ProjectConfig{}}, nil
+	}
+	
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &Config{Projects: []ProjectConfig{}}, nil
+		}
+		return nil, err
+	}
+	
+	var config Config
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, err
+	}
+	
+	return &config, nil
+}
+
+func saveConfig(config *Config) error {
+	configPath, err := getConfigPath()
+	if err != nil {
+		return err
+	}
+	
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+	
+	return os.WriteFile(configPath, data, 0600)
+}
+
+func (c *Config) AddProject(name, token string) {
+	// Remove existing project with same name
+	for i, p := range c.Projects {
+		if p.Name == name {
+			c.Projects = append(c.Projects[:i], c.Projects[i+1:]...)
+			break
+		}
+	}
+	
+	c.Projects = append(c.Projects, ProjectConfig{
+		Name:  name,
+		Token: token,
+	})
+	
+	// Set as default if it's the first project
+	if len(c.Projects) == 1 {
+		c.DefaultProject = name
+	}
+}
+
+func (c *Config) GetProject(name string) *ProjectConfig {
+	for _, p := range c.Projects {
+		if p.Name == name {
+			return &p
+		}
+	}
+	return nil
+}
+
+func (c *Config) RemoveProject(name string) {
+	for i, p := range c.Projects {
+		if p.Name == name {
+			c.Projects = append(c.Projects[:i], c.Projects[i+1:]...)
+			if c.DefaultProject == name && len(c.Projects) > 0 {
+				c.DefaultProject = c.Projects[0].Name
+			}
+			break
+		}
+	}
+}
 
 // Styles
 var (
@@ -49,18 +153,59 @@ var (
 	successStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#04B575")).
 			Bold(true)
+
+	warningStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFAA00"))
+
+	focusedStyle = lipgloss.NewStyle().
+			BorderForeground(lipgloss.Color("#874BFD"))
+
+	blurredStyle = lipgloss.NewStyle().
+			BorderForeground(lipgloss.Color("#626262"))
 )
 
 // App states
 type state int
 
 const (
-	stateTokenInput state = iota
+	stateProjectSelect state = iota
+	stateProjectManage
+	stateTokenInput
 	stateLoading
 	stateResourceView
 	stateContextMenu
 	stateError
 )
+
+// Input forms
+type inputForm struct {
+	inputs    []textinput.Model
+	focusIdx  int
+	submitBtn string
+	cancelBtn string
+}
+
+func newProjectForm() inputForm {
+	inputs := make([]textinput.Model, 2)
+	
+	inputs[0] = textinput.New()
+	inputs[0].Placeholder = "Project name (e.g., production, staging)"
+	inputs[0].Focus()
+	inputs[0].Width = 40
+	
+	inputs[1] = textinput.New()
+	inputs[1].Placeholder = "Hetzner Cloud API token"
+	inputs[1].Width = 50
+	inputs[1].EchoMode = textinput.EchoPassword
+	inputs[1].EchoCharacter = '•'
+	
+	return inputForm{
+		inputs:    inputs,
+		focusIdx:  0,
+		submitBtn: "Add Project",
+		cancelBtn: "Cancel",
+	}
+}
 
 // Key bindings
 type keyMap struct {
@@ -70,6 +215,8 @@ type keyMap struct {
 	Right  key.Binding
 	Tab    key.Binding
 	Enter  key.Binding
+	Delete key.Binding
+	Add    key.Binding
 	Quit   key.Binding
 	Help   key.Binding
 }
@@ -81,7 +228,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Left, k.Right},
-		{k.Tab, k.Enter},
+		{k.Tab, k.Enter, k.Add, k.Delete},
 		{k.Help, k.Quit},
 	}
 }
@@ -110,6 +257,14 @@ var keys = keyMap{
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),
 		key.WithHelp("enter", "select"),
+	),
+	Delete: key.NewBinding(
+		key.WithKeys("d", "delete"),
+		key.WithHelp("d", "delete"),
+	),
+	Add: key.NewBinding(
+		key.WithKeys("a"),
+		key.WithHelp("a", "add project"),
 	),
 	Help: key.NewBinding(
 		key.WithKeys("?"),
@@ -143,6 +298,30 @@ type contextMenu struct {
 	items        []contextMenuItem
 	selectedItem int
 	server       *hcloud.Server
+}
+
+// Project list item
+type projectItem struct {
+	config    ProjectConfig
+	isDefault bool
+}
+
+func (i projectItem) FilterValue() string { return i.config.Name }
+func (i projectItem) Title() string {
+	if i.isDefault {
+		return fmt.Sprintf("⭐ %s", i.config.Name)
+	}
+	return i.config.Name
+}
+func (i projectItem) Description() string {
+	tokenPreview := i.config.Token
+	if len(tokenPreview) > 16 {
+		tokenPreview = tokenPreview[:16] + "..."
+	}
+	if i.isDefault {
+		return fmt.Sprintf("Token: %s (default project)", tokenPreview)
+	}
+	return fmt.Sprintf("Token: %s", tokenPreview)
 }
 
 // List items for different resources
@@ -202,9 +381,13 @@ func (i volumeItem) Description() string {
 
 // Main model
 type model struct {
-	state            state
-	tokenInput       textinput.Model
+	state           state
+	config          *Config
+	tokenInput      textinput.Model
+	projectForm     inputForm
+	projectList     list.Model
 	client          *hcloud.Client
+	currentProject  string
 	activeTab       resourceType
 	lists           map[resourceType]list.Model
 	contextMenu     contextMenu
@@ -216,6 +399,10 @@ type model struct {
 }
 
 // Messages
+type configLoadedMsg struct {
+	config *Config
+}
+
 type resourcesLoadedMsg struct {
 	servers       []*hcloud.Server
 	networks      []*hcloud.Network
@@ -235,7 +422,28 @@ type sshLaunchedMsg struct{}
 
 type clipboardCopiedMsg string
 
+type projectSavedMsg struct{}
+
 // Commands
+func loadConfigCmd() tea.Cmd {
+	return func() tea.Msg {
+		config, err := loadConfig()
+		if err != nil {
+			return errorMsg{err}
+		}
+		return configLoadedMsg{config}
+	}
+}
+
+func saveConfigCmd(config *Config) tea.Cmd {
+	return func() tea.Msg {
+		if err := saveConfig(config); err != nil {
+			return errorMsg{err}
+		}
+		return projectSavedMsg{}
+	}
+}
+
 func loadResources(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
@@ -341,7 +549,7 @@ func initialModel() model {
 	lists := make(map[resourceType]list.Model)
 	
 	return model{
-		state:      stateTokenInput,
+		state:      stateProjectSelect,
 		tokenInput: ti,
 		lists:      lists,
 		help:       help.New(),
@@ -349,7 +557,20 @@ func initialModel() model {
 }
 
 func (m model) Init() tea.Cmd {
-	return textinput.Blink
+	return tea.Batch(textinput.Blink, loadConfigCmd())
+}
+
+func (m *model) updateProjectList() {
+	items := make([]list.Item, len(m.config.Projects))
+	for i, project := range m.config.Projects {
+		items[i] = projectItem{
+			config:    project,
+			isDefault: project.Name == m.config.DefaultProject,
+		}
+	}
+	
+	m.projectList = list.New(items, list.NewDefaultDelegate(), m.width-4, m.height-8)
+	m.projectList.Title = "Hetzner Cloud Projects"
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -366,8 +587,94 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.lists[rt] = l
 		}
 		
+		if m.config != nil {
+			m.updateProjectList()
+		}
+		
+		// Update form inputs
+		for i := range m.projectForm.inputs {
+			m.projectForm.inputs[i].Width = min(50, msg.Width-10)
+		}
+		
+	case configLoadedMsg:
+		m.config = msg.config
+		m.updateProjectList()
+		
+		// If there's a default project, load it automatically
+		if m.config.DefaultProject != "" {
+			project := m.config.GetProject(m.config.DefaultProject)
+			if project != nil {
+				m.client = hcloud.NewClient(hcloud.WithToken(project.Token))
+				m.currentProject = project.Name
+				m.state = stateLoading
+				return m, loadResources(m.client)
+			}
+		}
+		
+		// If no projects, go to token input
+		if len(m.config.Projects) == 0 {
+			m.state = stateTokenInput
+		}
+		
 	case tea.KeyMsg:
 		switch m.state {
+		case stateProjectSelect:
+			switch {
+			case key.Matches(msg, keys.Enter):
+				if selectedItem := m.projectList.SelectedItem(); selectedItem != nil {
+					if projectItem, ok := selectedItem.(projectItem); ok {
+						m.client = hcloud.NewClient(hcloud.WithToken(projectItem.config.Token))
+						m.currentProject = projectItem.config.Name
+						m.state = stateLoading
+						return m, loadResources(m.client)
+					}
+				}
+				
+			case key.Matches(msg, keys.Add):
+				m.projectForm = newProjectForm()
+				m.state = stateProjectManage
+				
+			case key.Matches(msg, keys.Delete):
+				if selectedItem := m.projectList.SelectedItem(); selectedItem != nil {
+					if projectItem, ok := selectedItem.(projectItem); ok {
+						m.config.RemoveProject(projectItem.config.Name)
+						m.updateProjectList()
+						return m, saveConfigCmd(m.config)
+					}
+				}
+				
+			case key.Matches(msg, keys.Quit):
+				return m, tea.Quit
+			}
+			
+		case stateProjectManage:
+			switch {
+			case key.Matches(msg, keys.Tab):
+				m.projectForm.focusIdx = (m.projectForm.focusIdx + 1) % len(m.projectForm.inputs)
+				for i := range m.projectForm.inputs {
+					if i == m.projectForm.focusIdx {
+						m.projectForm.inputs[i].Focus()
+					} else {
+						m.projectForm.inputs[i].Blur()
+					}
+				}
+				
+			case key.Matches(msg, keys.Enter):
+				// Submit form
+				name := strings.TrimSpace(m.projectForm.inputs[0].Value())
+				token := strings.TrimSpace(m.projectForm.inputs[1].Value())
+				
+				if name != "" && token != "" {
+					m.config.AddProject(name, token)
+					m.updateProjectList()
+					m.state = stateProjectSelect
+					return m, saveConfigCmd(m.config)
+				}
+				
+			case key.Matches(msg, keys.Quit):
+				m.state = stateProjectSelect
+			}
+			
 		case stateTokenInput:
 			switch {
 			case key.Matches(msg, keys.Enter):
@@ -381,7 +688,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, loadResources(m.client)
 				
 			case key.Matches(msg, keys.Quit):
-				return m, tea.Quit
+				if len(m.config.Projects) > 0 {
+					m.state = stateProjectSelect
+				} else {
+					return m, tea.Quit
+				}
 			}
 			
 		case stateResourceView:
@@ -423,7 +734,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				
 			case key.Matches(msg, keys.Quit):
-				return m, tea.Quit
+				m.state = stateProjectSelect
 			}
 			
 		case stateContextMenu:
@@ -477,6 +788,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 		}
+		
+	case projectSavedMsg:
+		m.statusMessage = "✅ Project configuration saved"
+		return m, clearStatusMessage()
 		
 	case resourcesLoadedMsg:
 		m.state = stateResourceView
@@ -542,6 +857,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	
+	if m.state == stateProjectSelect && m.config != nil {
+		var cmd tea.Cmd
+		m.projectList, cmd = m.projectList.Update(msg)
+		return m, cmd
+	}
+	
+	if m.state == stateProjectManage {
+		var cmd tea.Cmd
+		m.projectForm.inputs[m.projectForm.focusIdx], cmd = m.projectForm.inputs[m.projectForm.focusIdx].Update(msg)
+		return m, cmd
+	}
+	
 	if m.state == stateResourceView {
 		if currentList, exists := m.lists[m.activeTab]; exists {
 			var cmd tea.Cmd
@@ -555,12 +882,73 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	switch m.state {
+	case stateProjectSelect:
+		if m.config == nil {
+			return fmt.Sprintf(
+				"\n%s\n\n%s\n",
+				titleStyle.Render("Hetzner Cloud TUI"),
+				infoStyle.Render("Loading configuration..."),
+			)
+		}
+		
+		if len(m.config.Projects) == 0 {
+			return fmt.Sprintf(
+				"\n%s\n\n%s\n\n%s\n",
+				titleStyle.Render("Hetzner Cloud TUI"),
+				warningStyle.Render("No projects configured yet."),
+				helpStyle.Render("Press 'a' to add your first project • Press q to quit"),
+			)
+		}
+		
+		// Status message
+		statusView := ""
+		if m.statusMessage != "" {
+			statusView = "\n" + successStyle.Render(m.statusMessage)
+		}
+		
+		return fmt.Sprintf(
+			"\n%s\n\n%s%s\n\n%s\n",
+			titleStyle.Render("Hetzner Cloud TUI"),
+			m.projectList.View(),
+			statusView,
+			helpStyle.Render("Enter: select project • a: add project • d: delete project • q: quit"),
+		)
+		
+	case stateProjectManage:
+		var formView strings.Builder
+		formView.WriteString("Add New Project\n\n")
+		
+		for i, input := range m.projectForm.inputs {
+			var style lipgloss.Style
+			if i == m.projectForm.focusIdx {
+				style = focusedStyle
+			} else {
+				style = blurredStyle
+			}
+			
+			label := "Project Name:"
+			if i == 1 {
+				label = "API Token:"
+			}
+			
+			formView.WriteString(fmt.Sprintf("%s\n%s\n\n", label, style.Render(input.View())))
+		}
+		
+		formView.WriteString(helpStyle.Render("Tab: next field • Enter: save • Esc: cancel"))
+		
+		return fmt.Sprintf(
+			"\n%s\n\n%s\n",
+			titleStyle.Render("Hetzner Cloud TUI - Add Project"),
+			formView.String(),
+		)
+		
 	case stateTokenInput:
 		return fmt.Sprintf(
-			"\n%s\n\n%s\n\n%s\n",
+			"\n%s\n\n%s\n\n%s\n\n%s\n",
 			titleStyle.Render("Hetzner Cloud TUI"),
+			infoStyle.Render("Enter API token for one-time access:"),
 			m.tokenInput.View(),
-			helpStyle.Render("Press Enter to continue • Press q to quit"),
+			helpStyle.Render("Press Enter to continue • Press q to go back"),
 		)
 		
 	case stateLoading:
@@ -571,6 +959,12 @@ func (m model) View() string {
 		)
 		
 	case stateResourceView:
+		// Project header
+		projectHeader := fmt.Sprintf("Project: %s", m.currentProject)
+		if m.currentProject == "" {
+			projectHeader = "One-time Access"
+		}
+		
 		// Render tabs
 		var tabs []string
 		for i, tab := range resourceTabs {
@@ -594,13 +988,14 @@ func (m model) View() string {
 			statusView = "\n" + successStyle.Render(m.statusMessage)
 		}
 		
-		helpText := "Tab: switch view • ←/→: navigate tabs • Enter: actions • q: quit"
+		helpText := "Tab: switch view • ←/→: navigate tabs • Enter: actions • q: back to projects"
 		if m.activeTab == resourceServers {
-			helpText = "Tab: switch view • ←/→: navigate tabs • Enter: server actions • q: quit"
+			helpText = "Tab: switch view • ←/→: navigate tabs • Enter: server actions • q: back to projects"
 		}
 		
 		return fmt.Sprintf(
-			"%s\n\n%s%s\n\n%s",
+			"%s\n%s\n\n%s%s\n\n%s",
+			infoStyle.Render(projectHeader),
 			tabsView,
 			listView,
 			statusView,
@@ -609,6 +1004,11 @@ func (m model) View() string {
 		
 	case stateContextMenu:
 		// Render the current resource view in background
+		projectHeader := fmt.Sprintf("Project: %s", m.currentProject)
+		if m.currentProject == "" {
+			projectHeader = "One-time Access"
+		}
+		
 		var tabs []string
 		for i, tab := range resourceTabs {
 			if resourceType(i) == m.activeTab {
@@ -646,7 +1046,7 @@ func (m model) View() string {
 		// Position menu overlay
 		menuOverlay := lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, menu)
 		
-		background := fmt.Sprintf("%s\n\n%s", tabsView, listView)
+		background := fmt.Sprintf("%s\n%s\n\n%s", infoStyle.Render(projectHeader), tabsView, listView)
 		
 		return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, background) + menuOverlay
 		
@@ -660,6 +1060,14 @@ func (m model) View() string {
 	}
 	
 	return ""
+}
+
+// Helper function for min (Go 1.21+)
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func main() {
