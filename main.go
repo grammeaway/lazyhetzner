@@ -38,12 +38,12 @@ func getConfigPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	configDir := filepath.Join(homeDir, ".config", "lazyhetzner")
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return "", err
 	}
-	
+
 	return filepath.Join(configDir, "config.json"), nil
 }
 
@@ -52,7 +52,7 @@ func loadConfig() (*Config, error) {
 	if err != nil {
 		return &Config{Projects: []ProjectConfig{}}, nil
 	}
-	
+
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -60,12 +60,12 @@ func loadConfig() (*Config, error) {
 		}
 		return nil, err
 	}
-	
+
 	var config Config
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, err
 	}
-	
+
 	return &config, nil
 }
 
@@ -74,12 +74,12 @@ func saveConfig(config *Config) error {
 	if err != nil {
 		return err
 	}
-	
+
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(configPath, data, 0600)
 }
 
@@ -91,12 +91,12 @@ func (c *Config) AddProject(name, token string) {
 			break
 		}
 	}
-	
+
 	c.Projects = append(c.Projects, ProjectConfig{
 		Name:  name,
 		Token: token,
 	})
-	
+
 	// Set as default if it's the first project
 	if len(c.Projects) == 1 {
 		c.DefaultProject = name
@@ -188,18 +188,18 @@ type inputForm struct {
 
 func newProjectForm() inputForm {
 	inputs := make([]textinput.Model, 2)
-	
+
 	inputs[0] = textinput.New()
 	inputs[0].Placeholder = "Project name (e.g., production, staging)"
 	inputs[0].Focus()
 	inputs[0].Width = 40
-	
+
 	inputs[1] = textinput.New()
 	inputs[1].Placeholder = "Hetzner Cloud API token"
 	inputs[1].Width = 50
 	inputs[1].EchoMode = textinput.EchoPassword
 	inputs[1].EchoCharacter = '•'
-	
+
 	return inputForm{
 		inputs:    inputs,
 		focusIdx:  0,
@@ -382,21 +382,22 @@ func (i volumeItem) Description() string {
 
 // Main model
 type model struct {
-	state           state
-	config          *Config
-	tokenInput      textinput.Model
-	projectForm     inputForm
-	projectList     list.Model
-	client          *hcloud.Client
-	currentProject  string
-	activeTab       resourceType
-	lists           map[resourceType]list.Model
-	contextMenu     contextMenu
-	help            help.Model
-	err             error
-	width           int
-	height          int
-	statusMessage   string
+	state          state
+	config         *Config
+	tokenInput     textinput.Model
+	projectForm    inputForm
+	projectList    list.Model
+	client         *hcloud.Client
+	currentProject string
+	activeTab      resourceType
+	lists          map[resourceType]list.Model
+	contextMenu    contextMenu
+	help           help.Model
+	err            error
+	width          int
+	height         int
+	statusMessage  string
+	sessionInfo    SessionInfo
 }
 
 // Messages
@@ -425,6 +426,10 @@ type clipboardCopiedMsg string
 
 type projectSavedMsg struct{}
 
+type tmuxSSHLaunchedMsg struct{}
+
+type zellijSSHLaunchedMsg struct{}
+
 // Commands
 func loadConfigCmd() tea.Cmd {
 	return func() tea.Msg {
@@ -448,27 +453,27 @@ func saveConfigCmd(config *Config) tea.Cmd {
 func loadResources(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		
+
 		servers, err := client.Server.All(ctx)
 		if err != nil {
 			return errorMsg{err}
 		}
-		
+
 		networks, err := client.Network.All(ctx)
 		if err != nil {
 			return errorMsg{err}
 		}
-		
+
 		loadBalancers, err := client.LoadBalancer.All(ctx)
 		if err != nil {
 			return errorMsg{err}
 		}
-		
+
 		volumes, err := client.Volume.All(ctx)
 		if err != nil {
 			return errorMsg{err}
 		}
-		
+
 		return resourcesLoadedMsg{
 			servers:       servers,
 			networks:      networks,
@@ -481,9 +486,9 @@ func loadResources(client *hcloud.Client) tea.Cmd {
 func getResourceLabels(client *hcloud.Client, resourceType resourceType, resourceID int) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		
+
 		var labels map[string]string
-		
+
 		switch resourceType {
 		case resourceServers:
 			server, _, err := client.Server.Get(ctx, strconv.Itoa(resourceID))
@@ -491,10 +496,10 @@ func getResourceLabels(client *hcloud.Client, resourceType resourceType, resourc
 				return errorMsg{err}
 			}
 			if server == nil {
-				return errorMsg{fmt.Errorf("server with ID %d not found",strconv.Itoa(resourceID))}
+				return errorMsg{fmt.Errorf("server with ID %d not found", strconv.Itoa(resourceID))}
 			}
 			labels = server.Labels
-			
+
 		case resourceNetworks:
 			network, _, err := client.Network.Get(ctx, strconv.Itoa(resourceID))
 			if err != nil {
@@ -504,7 +509,7 @@ func getResourceLabels(client *hcloud.Client, resourceType resourceType, resourc
 				return errorMsg{fmt.Errorf("network with ID %d not found", resourceID)}
 			}
 			labels = network.Labels
-			
+
 		case resourceLoadBalancers:
 			lb, _, err := client.LoadBalancer.Get(ctx, strconv.Itoa(resourceID))
 			if err != nil {
@@ -514,7 +519,7 @@ func getResourceLabels(client *hcloud.Client, resourceType resourceType, resourc
 				return errorMsg{fmt.Errorf("load balancer with ID %d not found", resourceID)}
 			}
 			labels = lb.Labels
-			
+
 		case resourceVolumes:
 			volume, _, err := client.Volume.Get(ctx, strconv.Itoa(resourceID))
 			if err != nil {
@@ -524,16 +529,16 @@ func getResourceLabels(client *hcloud.Client, resourceType resourceType, resourc
 				return errorMsg{fmt.Errorf("volume with ID %d not found", resourceID)}
 			}
 			labels = volume.Labels
-			
+
 		default:
 			return errorMsg{fmt.Errorf("unknown resource type: %d", resourceType)}
 		}
-		
+
 		labelList := make([]string, 0, len(labels))
 		for k, v := range labels {
 			labelList = append(labelList, fmt.Sprintf("%s: %s", k, v))
 		}
-		
+
 		return statusMsg(fmt.Sprintf("Labels for resource ID %d:\n%s", resourceID, strings.Join(labelList, "\n")))
 	}
 }
@@ -551,7 +556,7 @@ func copyToClipboard(text string) tea.Cmd {
 func launchSSH(ip string) tea.Cmd {
 	return func() tea.Msg {
 		var cmd *exec.Cmd
-		
+
 		// Determine terminal based on OS
 		switch runtime.GOOS {
 		case "darwin": // macOS
@@ -576,23 +581,22 @@ func launchSSH(ip string) tea.Cmd {
 			// Use Windows Terminal if available, fallback to Powershell, otherwise cmd
 			if _, err := exec.LookPath("wt"); err == nil {
 				cmd = exec.Command("wt", "ssh", fmt.Sprintf("root@%s", ip))
-
 			} else if _, err := exec.LookPath("powershell"); err == nil {
 				cmd = exec.Command("powershell", "-Command", fmt.Sprintf("ssh root@%s", ip))
 			} else {
 				cmd = exec.Command("cmd", "/C", fmt.Sprintf("ssh root@%s", ip))
 			}
 		}
-		
+
 		if cmd == nil {
 			return errorMsg{fmt.Errorf("no suitable terminal found")}
 		}
-		
+
 		err := cmd.Start()
 		if err != nil {
 			return errorMsg{err}
 		}
-		
+
 		return sshLaunchedMsg{}
 	}
 }
@@ -611,12 +615,13 @@ func initialModel() model {
 	ti.Width = 50
 
 	lists := make(map[resourceType]list.Model)
-	
+
 	return model{
-		state:      stateProjectSelect,
-		tokenInput: ti,
-		lists:      lists,
-		help:       help.New(),
+		state:       stateProjectSelect,
+		tokenInput:  ti,
+		lists:       lists,
+		help:        help.New(),
+		sessionInfo: detectSession(),
 	}
 }
 
@@ -632,7 +637,7 @@ func (m *model) updateProjectList() {
 			isDefault: project.Name == m.config.DefaultProject,
 		}
 	}
-	
+
 	m.projectList = list.New(items, list.NewDefaultDelegate(), m.width-4, m.height-8)
 	m.projectList.Title = "Hetzner Cloud Projects"
 }
@@ -642,7 +647,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		
+
 		// Update list sizes
 		for rt := range m.lists {
 			l := m.lists[rt]
@@ -650,20 +655,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			l.SetHeight(msg.Height - 10)
 			m.lists[rt] = l
 		}
-		
+
 		if m.config != nil {
 			m.updateProjectList()
 		}
-		
+
 		// Update form inputs
 		for i := range m.projectForm.inputs {
 			m.projectForm.inputs[i].Width = min(50, msg.Width-10)
 		}
-		
+
 	case configLoadedMsg:
 		m.config = msg.config
 		m.updateProjectList()
-		
+
 		// If there's a default project, load it automatically
 		if m.config.DefaultProject != "" {
 			project := m.config.GetProject(m.config.DefaultProject)
@@ -674,12 +679,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, loadResources(m.client)
 			}
 		}
-		
+
 		// If no projects, go to token input
 		if len(m.config.Projects) == 0 {
 			m.state = stateTokenInput
 		}
-		
+
 	case tea.KeyMsg:
 		switch m.state {
 		case stateProjectSelect:
@@ -693,11 +698,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, loadResources(m.client)
 					}
 				}
-				
+
 			case key.Matches(msg, keys.Add):
 				m.projectForm = newProjectForm()
 				m.state = stateProjectManage
-				
+
 			case key.Matches(msg, keys.Delete):
 				if selectedItem := m.projectList.SelectedItem(); selectedItem != nil {
 					if projectItem, ok := selectedItem.(projectItem); ok {
@@ -706,11 +711,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, saveConfigCmd(m.config)
 					}
 				}
-				
+
 			case key.Matches(msg, keys.Quit):
 				return m, tea.Quit
 			}
-			
+
 		case stateProjectManage:
 			switch {
 			case key.Matches(msg, keys.Tab):
@@ -722,23 +727,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.projectForm.inputs[i].Blur()
 					}
 				}
-				
+
 			case key.Matches(msg, keys.Enter):
 				// Submit form
 				name := strings.TrimSpace(m.projectForm.inputs[0].Value())
 				token := strings.TrimSpace(m.projectForm.inputs[1].Value())
-				
+
 				if name != "" && token != "" {
 					m.config.AddProject(name, token)
 					m.updateProjectList()
 					m.state = stateProjectSelect
 					return m, saveConfigCmd(m.config)
 				}
-				
+
 			case key.Matches(msg, keys.Quit):
 				m.state = stateProjectSelect
 			}
-			
+
 		case stateTokenInput:
 			switch {
 			case key.Matches(msg, keys.Enter):
@@ -746,11 +751,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if token == "" {
 					return m, nil
 				}
-				
+
 				m.client = hcloud.NewClient(hcloud.WithToken(token))
 				m.state = stateLoading
 				return m, loadResources(m.client)
-				
+
 			case key.Matches(msg, keys.Quit):
 				if len(m.config.Projects) > 0 {
 					m.state = stateProjectSelect
@@ -758,7 +763,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Quit
 				}
 			}
-			
+
 		case stateResourceView:
 			switch {
 			case key.Matches(msg, keys.Enter):
@@ -768,14 +773,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
 							if serverItem, ok := selectedItem.(serverItem); ok {
 								m.contextMenu = contextMenu{
-									items: []contextMenuItem{
-										{label: "📋 Copy Public IP", action: "copy_public_ip"},
-										{label: "📋 Copy Private IP", action: "copy_private_ip"},
-										{label: "🔗 SSH (New Terminal)", action: "ssh_new_terminal"},
-										{label: "🔗 SSH (Current Terminal)", action: "ssh_current_terminal"},
-										{label: "🏷️ Show Labels", action: "show_labels"},
-										{label: "❌ Cancel", action: "cancel"},
-									},
+									items:        getSSHMenuItems(m.sessionInfo),
 									selectedItem: 0,
 									server:       serverItem.server,
 								}
@@ -784,41 +782,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					}
 				}
-				
+
 			case key.Matches(msg, keys.Tab):
 				m.activeTab = (m.activeTab + 1) % resourceType(len(resourceTabs))
-				
+
 			case key.Matches(msg, keys.Left):
 				if m.activeTab > 0 {
 					m.activeTab--
 				}
-				
+
 			case key.Matches(msg, keys.Right):
 				if int(m.activeTab) < len(resourceTabs)-1 {
 					m.activeTab++
 				}
-				
+
 			case key.Matches(msg, keys.Quit):
 				m.state = stateProjectSelect
 			}
-			
+
 		case stateContextMenu:
 			switch {
 			case key.Matches(msg, keys.Up):
 				if m.contextMenu.selectedItem > 0 {
 					m.contextMenu.selectedItem--
 				}
-				
+
 			case key.Matches(msg, keys.Down):
 				if m.contextMenu.selectedItem < len(m.contextMenu.items)-1 {
 					m.contextMenu.selectedItem++
 				}
-				
+
 			case key.Matches(msg, keys.Enter):
 				selectedAction := m.contextMenu.items[m.contextMenu.selectedItem].action
 				server := m.contextMenu.server
 				m.state = stateResourceView
-				
+
 				switch selectedAction {
 				case "copy_public_ip":
 					if server.PublicNet.IPv4.IP != nil {
@@ -832,13 +830,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if len(server.PrivateNet) > 0 && server.PrivateNet[0].IP != nil {
 						return m, copyToClipboard(server.PrivateNet[0].IP.String())
 					}
+				case "ssh_tmux_window":
+					if server.PublicNet.IPv4.IP != nil {
+						return m, launchSSHInTmuxWindow(server.PublicNet.IPv4.IP.String())
+					}
+				case "ssh_tmux_pane":
+					if server.PublicNet.IPv4.IP != nil {
+						return m, launchSSHInTmuxPane(server.PublicNet.IPv4.IP.String())
+					}
+				case "ssh_zellij_tab":
+					if server.PublicNet.IPv4.IP != nil {
+						return m, launchSSHInZellijTab(server.PublicNet.IPv4.IP.String())
+					}
+				case "ssh_zellij_pane":
+					if server.PublicNet.IPv4.IP != nil {
+						return m, launchSSHInZellijPane(server.PublicNet.IPv4.IP.String())
+					}
 				case "ssh_new_terminal":
 					if server.PublicNet.IPv4.IP != nil {
 						return m, launchSSH(server.PublicNet.IPv4.IP.String())
 					}
 				case "ssh_current_terminal":
 					if server.PublicNet.IPv4.IP != nil {
-						// Suspend TUI and run SSH in current terminal
+						// Suspend lazyhetzner and run SSH in current terminal
 						return m, tea.ExecProcess(exec.Command("ssh", fmt.Sprintf("root@%s", server.PublicNet.IPv4.IP.String())), func(err error) tea.Msg {
 							if err != nil {
 								return errorMsg{err}
@@ -847,97 +861,104 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						})
 					}
 				}
-				
+
 			case key.Matches(msg, keys.Quit):
 				m.state = stateResourceView
 			}
-			
+
 		case stateError:
 			if key.Matches(msg, keys.Quit) {
 				return m, tea.Quit
 			}
 		}
-		
+
 	case projectSavedMsg:
 		m.statusMessage = "✅ Project configuration saved"
 		return m, clearStatusMessage()
-		
+
 	case resourcesLoadedMsg:
 		m.state = stateResourceView
-		
+
 		// Create lists for each resource type
 		serverItems := make([]list.Item, len(msg.servers))
 		for i, server := range msg.servers {
 			serverItems[i] = serverItem{server: server}
 		}
-		
+
 		networkItems := make([]list.Item, len(msg.networks))
 		for i, network := range msg.networks {
 			networkItems[i] = networkItem{network: network}
 		}
-		
+
 		lbItems := make([]list.Item, len(msg.loadBalancers))
 		for i, lb := range msg.loadBalancers {
 			lbItems[i] = loadBalancerItem{lb: lb}
 		}
-		
+
 		volumeItems := make([]list.Item, len(msg.volumes))
 		for i, volume := range msg.volumes {
 			volumeItems[i] = volumeItem{volume: volume}
 		}
-		
+
 		// Initialize lists
 		serversList := list.New(serverItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		serversList.Title = "Servers"
 		m.lists[resourceServers] = serversList
-		
+
 		networksList := list.New(networkItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		networksList.Title = "Networks"
 		m.lists[resourceNetworks] = networksList
-		
+
 		lbList := list.New(lbItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		lbList.Title = "Load Balancers"
 		m.lists[resourceLoadBalancers] = lbList
-		
+
 		volumesList := list.New(volumeItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		volumesList.Title = "Volumes"
 		m.lists[resourceVolumes] = volumesList
-		
+
 	case clipboardCopiedMsg:
 		m.statusMessage = fmt.Sprintf("✅ Copied %s to clipboard", string(msg))
 		return m, clearStatusMessage()
-		
+
 	case sshLaunchedMsg:
 		m.statusMessage = "🚀 SSH session launched"
 		return m, clearStatusMessage()
-		
+	case tmuxSSHLaunchedMsg:
+		m.statusMessage = "🪟 SSH session launched in tmux"
+		return m, clearStatusMessage()
+
+	case zellijSSHLaunchedMsg:
+		m.statusMessage = "📱 SSH session launched in zellij"
+		return m, clearStatusMessage()
+
 	case statusMsg:
 		m.statusMessage = string(msg)
-		
+
 	case errorMsg:
 		m.state = stateError
 		m.err = msg.err
 	}
-	
+
 	// Update components
 	if m.state == stateTokenInput {
 		var cmd tea.Cmd
 		m.tokenInput, cmd = m.tokenInput.Update(msg)
 		return m, cmd
 	}
-	
+
 	if m.state == stateProjectSelect && m.config != nil {
 		var cmd tea.Cmd
 		m.projectList, cmd = m.projectList.Update(msg)
 		return m, cmd
 	}
-	
+
 	if m.state == stateProjectManage {
 		var cmd tea.Cmd
 		m.projectForm.inputs[m.projectForm.focusIdx], cmd = m.projectForm.inputs[m.projectForm.focusIdx].Update(msg)
 		return m, cmd
 	}
-	
+
 	if m.state == stateResourceView {
 		if currentList, exists := m.lists[m.activeTab]; exists {
 			var cmd tea.Cmd
@@ -945,7 +966,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 	}
-	
+
 	return m, nil
 }
 
@@ -959,7 +980,7 @@ func (m model) View() string {
 				infoStyle.Render("Loading configuration..."),
 			)
 		}
-		
+
 		if len(m.config.Projects) == 0 {
 			return fmt.Sprintf(
 				"\n%s\n\n%s\n\n%s\n",
@@ -968,13 +989,13 @@ func (m model) View() string {
 				helpStyle.Render("Press 'a' to add your first project • Press q to quit"),
 			)
 		}
-		
+
 		// Status message
 		statusView := ""
 		if m.statusMessage != "" {
 			statusView = "\n" + successStyle.Render(m.statusMessage)
 		}
-		
+
 		return fmt.Sprintf(
 			"\n%s\n\n%s%s\n\n%s\n",
 			titleStyle.Render("lazyhetzner"),
@@ -982,11 +1003,11 @@ func (m model) View() string {
 			statusView,
 			helpStyle.Render("Enter: select project • a: add project • d: delete project • q: quit"),
 		)
-		
+
 	case stateProjectManage:
 		var formView strings.Builder
 		formView.WriteString("Add New Project\n\n")
-		
+
 		for i, input := range m.projectForm.inputs {
 			var style lipgloss.Style
 			if i == m.projectForm.focusIdx {
@@ -994,23 +1015,23 @@ func (m model) View() string {
 			} else {
 				style = blurredStyle
 			}
-			
+
 			label := "Project Name:"
 			if i == 1 {
 				label = "API Token:"
 			}
-			
+
 			formView.WriteString(fmt.Sprintf("%s\n%s\n\n", label, style.Render(input.View())))
 		}
-		
+
 		formView.WriteString(helpStyle.Render("Tab: next field • Enter: save • Esc: cancel"))
-		
+
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n",
 			titleStyle.Render("lazyhetzner - Add Project"),
 			formView.String(),
 		)
-		
+
 	case stateTokenInput:
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n\n%s\n\n%s\n",
@@ -1019,21 +1040,21 @@ func (m model) View() string {
 			m.tokenInput.View(),
 			helpStyle.Render("Press Enter to continue • Press q to go back"),
 		)
-		
+
 	case stateLoading:
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n",
 			titleStyle.Render("lazyhetzner"),
 			infoStyle.Render("Loading resources..."),
 		)
-		
+
 	case stateResourceView:
 		// Project header
 		projectHeader := fmt.Sprintf("Project: %s", m.currentProject)
 		if m.currentProject == "" {
 			projectHeader = "One-time Access"
 		}
-		
+
 		// Render tabs
 		var tabs []string
 		for i, tab := range resourceTabs {
@@ -1044,24 +1065,24 @@ func (m model) View() string {
 			}
 		}
 		tabsView := strings.Join(tabs, " ")
-		
+
 		// Render current list
 		var listView string
 		if currentList, exists := m.lists[m.activeTab]; exists {
 			listView = currentList.View()
 		}
-		
+
 		// Status message
 		statusView := ""
 		if m.statusMessage != "" {
 			statusView = "\n" + successStyle.Render(m.statusMessage)
 		}
-		
+
 		helpText := "Tab: switch view • ←/→: navigate tabs • Enter: actions • q: back to projects"
 		if m.activeTab == resourceServers {
 			helpText = "Tab: switch view • ←/→: navigate tabs • Enter: server actions • q: back to projects"
 		}
-		
+
 		return fmt.Sprintf(
 			"%s\n%s\n\n%s%s\n\n%s",
 			infoStyle.Render(projectHeader),
@@ -1070,14 +1091,14 @@ func (m model) View() string {
 			statusView,
 			helpStyle.Render(helpText),
 		)
-		
+
 	case stateContextMenu:
 		// Render the current resource view in background
 		projectHeader := fmt.Sprintf("Project: %s", m.currentProject)
 		if m.currentProject == "" {
 			projectHeader = "One-time Access"
 		}
-		
+
 		var tabs []string
 		for i, tab := range resourceTabs {
 			if resourceType(i) == m.activeTab {
@@ -1087,12 +1108,12 @@ func (m model) View() string {
 			}
 		}
 		tabsView := strings.Join(tabs, " ")
-		
+
 		var listView string
 		if currentList, exists := m.lists[m.activeTab]; exists {
 			listView = currentList.View()
 		}
-		
+
 		// Render context menu
 		var menuItems []string
 		for i, item := range m.contextMenu.items {
@@ -1102,23 +1123,23 @@ func (m model) View() string {
 				menuItems = append(menuItems, item.label)
 			}
 		}
-		
+
 		menuContent := strings.Join(menuItems, "\n")
 		menu := menuStyle.Render(fmt.Sprintf("Actions for %s:\n\n%s", m.contextMenu.server.Name, menuContent))
-		
+
 		// Center the menu
 		menuHeight := strings.Count(menu, "\n") + 1
 		menuWidth := 40 // Approximate width
 		_ = menuHeight  // Suppress unused variable warning
 		_ = menuWidth   // Suppress unused variable warning
-		
+
 		// Position menu overlay
 		menuOverlay := lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, menu)
-		
+
 		background := fmt.Sprintf("%s\n%s\n\n%s", infoStyle.Render(projectHeader), tabsView, listView)
-		
+
 		return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, background) + menuOverlay
-		
+
 	case stateError:
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n\n%s\n",
@@ -1127,7 +1148,7 @@ func (m model) View() string {
 			helpStyle.Render("Press q to quit"),
 		)
 	}
-	
+
 	return ""
 }
 
