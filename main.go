@@ -220,6 +220,7 @@ type keyMap struct {
 	Add    key.Binding
 	Quit   key.Binding
 	Help   key.Binding
+	Reload key.Binding
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
@@ -274,6 +275,10 @@ var keys = keyMap{
 	Quit: key.NewBinding(
 		key.WithKeys("q", "esc", "ctrl+c"),
 		key.WithHelp("q", "quit"),
+	),
+	Reload: key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("r", "reload resources"),
 	),
 }
 
@@ -338,7 +343,7 @@ func (i serverItem) Description() string {
 		statusDisplay = "🟢 " + string(i.server.Status)
 	} else if i.server.Status == hcloud.ServerStatusStarting {
 		statusDisplay = "🟡 " + string(i.server.Status)
-	}else {
+	} else {
 		statusDisplay = "🔴 " + string(i.server.Status)
 	}
 	return fmt.Sprintf("%s | %s | %s", statusDisplay, i.server.ServerType.Name, i.server.PublicNet.IPv4.IP.String())
@@ -788,6 +793,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, keys.Tab):
 				m.activeTab = (m.activeTab + 1) % resourceType(len(resourceTabs))
 
+			case key.Matches(msg, keys.Reload):
+				if m.client != nil {
+					m.state = stateLoading
+					return m, loadResources(m.client)
+				}
 			case key.Matches(msg, keys.Left):
 				if m.activeTab > 0 {
 					m.activeTab--
@@ -1080,9 +1090,9 @@ func (m model) View() string {
 			statusView = "\n" + successStyle.Render(m.statusMessage)
 		}
 
-		helpText := "Tab: switch view • ←/→: navigate tabs • Enter: actions • q: back to projects"
+		helpText := "Tab: switch view • ←/→: navigate tabs • Enter: actions • r: reload resources • q: back to projects"
 		if m.activeTab == resourceServers {
-			helpText = "Tab: switch view • ←/→: navigate tabs • Enter: server actions • q: back to projects"
+			helpText = "Tab: switch view • ←/→: navigate tabs • Enter: server actions • r: reload resources • q: back to projects"
 		}
 
 		return fmt.Sprintf(
