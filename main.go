@@ -336,7 +336,9 @@ func (i serverItem) Description() string {
 	var statusDisplay string
 	if i.server.Status == hcloud.ServerStatusRunning {
 		statusDisplay = "🟢 " + string(i.server.Status)
-	} else {
+	} else if i.server.Status == hcloud.ServerStatusStarting {
+		statusDisplay = "🟡 " + string(i.server.Status)
+	}else {
 		statusDisplay = "🔴 " + string(i.server.Status)
 	}
 	return fmt.Sprintf("%s | %s | %s", statusDisplay, i.server.ServerType.Name, i.server.PublicNet.IPv4.IP.String())
