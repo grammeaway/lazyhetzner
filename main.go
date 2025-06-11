@@ -341,7 +341,7 @@ func (i serverItem) Description() string {
 	var statusDisplay string
 	if i.server.Status == hcloud.ServerStatusRunning {
 		statusDisplay = "🟢 " + string(i.server.Status)
-	} else if i.server.Status == hcloud.ServerStatusStarting {
+	} else if i.server.Status == hcloud.ServerStatusStarting || i.server.Status == hcloud.ServerStatusInitializing {
 		statusDisplay = "🟡 " + string(i.server.Status)
 	} else {
 		statusDisplay = "🔴 " + string(i.server.Status)
@@ -389,22 +389,25 @@ func (i volumeItem) Description() string {
 
 // Main model
 type model struct {
-	state          state
-	config         *Config
-	tokenInput     textinput.Model
-	projectForm    inputForm
-	projectList    list.Model
-	client         *hcloud.Client
-	currentProject string
-	activeTab      resourceType
-	lists          map[resourceType]list.Model
-	contextMenu    contextMenu
-	help           help.Model
-	err            error
-	width          int
-	height         int
-	statusMessage  string
-	sessionInfo    SessionInfo
+	state           state
+	config          *Config
+	tokenInput      textinput.Model
+	projectForm     inputForm
+	projectList     list.Model
+	client          *hcloud.Client
+	currentProject  string
+	activeTab       resourceType
+	lists           map[resourceType]list.Model
+	contextMenu     contextMenu
+	help            help.Model
+	err             error
+	width           int
+	height          int
+	statusMessage   string
+	sessionInfo     SessionInfo
+	loadedResources map[resourceType]bool
+	loadingResource resourceType
+	isLoading       bool
 }
 
 // Messages
@@ -436,6 +439,26 @@ type projectSavedMsg struct{}
 type tmuxSSHLaunchedMsg struct{}
 
 type zellijSSHLaunchedMsg struct{}
+
+type serversLoadedMsg struct {
+	servers []*hcloud.Server
+}
+
+type networksLoadedMsg struct {
+	networks []*hcloud.Network
+}
+
+type loadBalancersLoadedMsg struct {
+	loadBalancers []*hcloud.LoadBalancer
+}
+
+type volumesLoadedMsg struct {
+	volumes []*hcloud.Volume
+}
+
+type resourceLoadStartMsg struct {
+	resourceType resourceType
+}
 
 // Commands
 func loadConfigCmd() tea.Cmd {
@@ -487,6 +510,75 @@ func loadResources(client *hcloud.Client) tea.Cmd {
 			loadBalancers: loadBalancers,
 			volumes:       volumes,
 		}
+	}
+}
+
+func loadServers(client *hcloud.Client) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		servers, err := client.Server.All(ctx)
+		if err != nil {
+			return errorMsg{err}
+		}
+		return serversLoadedMsg{servers: servers}
+	}
+}
+
+func loadNetworks(client *hcloud.Client) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		networks, err := client.Network.All(ctx)
+		if err != nil {
+			return errorMsg{err}
+		}
+		return networksLoadedMsg{networks: networks}
+	}
+}
+
+func loadLoadBalancers(client *hcloud.Client) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		loadBalancers, err := client.LoadBalancer.All(ctx)
+		if err != nil {
+			return errorMsg{err}
+		}
+		return loadBalancersLoadedMsg{loadBalancers: loadBalancers}
+	}
+}
+
+func loadVolumes(client *hcloud.Client) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		volumes, err := client.Volume.All(ctx)
+		if err != nil {
+			return errorMsg{err}
+		}
+		return volumesLoadedMsg{volumes: volumes}
+	}
+}
+
+func startResourceLoad(rt resourceType) tea.Cmd {
+	return func() tea.Msg {
+		return resourceLoadStartMsg{resourceType: rt}
+	}
+}
+
+func (m *model) getResourceLoadCmd(rt resourceType) tea.Cmd {
+	if m.client == nil {
+		return nil
+	}
+
+	switch rt {
+	case resourceServers:
+		return loadServers(m.client)
+	case resourceNetworks:
+		return loadNetworks(m.client)
+	case resourceLoadBalancers:
+		return loadLoadBalancers(m.client)
+	case resourceVolumes:
+		return loadVolumes(m.client)
+	default:
+		return nil
 	}
 }
 
@@ -622,13 +714,16 @@ func initialModel() model {
 	ti.Width = 50
 
 	lists := make(map[resourceType]list.Model)
+	loadedResources := make(map[resourceType]bool)
 
 	return model{
-		state:       stateProjectSelect,
-		tokenInput:  ti,
-		lists:       lists,
-		help:        help.New(),
-		sessionInfo: detectSession(),
+		state:           stateProjectSelect,
+		tokenInput:      ti,
+		lists:           lists,
+		help:            help.New(),
+		sessionInfo:     detectSession(),
+		loadedResources: loadedResources,
+		isLoading:       false,
 	}
 }
 
@@ -676,14 +771,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.config = msg.config
 		m.updateProjectList()
 
-		// If there's a default project, load it automatically
+		// If there's a default project, set it up but don't load resources yet
 		if m.config.DefaultProject != "" {
 			project := m.config.GetProject(m.config.DefaultProject)
 			if project != nil {
 				m.client = hcloud.NewClient(hcloud.WithToken(project.Token))
 				m.currentProject = project.Name
-				m.state = stateLoading
-				return m, loadResources(m.client)
+				m.state = stateResourceView
+				// Load the first tab's resources
+				return m, tea.Batch(
+					startResourceLoad(m.activeTab),
+					m.getResourceLoadCmd(m.activeTab),
+				)
 			}
 		}
 
@@ -691,7 +790,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.config.Projects) == 0 {
 			m.state = stateTokenInput
 		}
-
 	case tea.KeyMsg:
 		switch m.state {
 		case stateProjectSelect:
@@ -701,11 +799,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if projectItem, ok := selectedItem.(projectItem); ok {
 						m.client = hcloud.NewClient(hcloud.WithToken(projectItem.config.Token))
 						m.currentProject = projectItem.config.Name
-						m.state = stateLoading
-						return m, loadResources(m.client)
+						m.state = stateResourceView
+						// Reset loaded resources for new project
+						m.loadedResources = make(map[resourceType]bool)
+						// Load the first tab's resources
+						return m, tea.Batch(
+							startResourceLoad(m.activeTab),
+							m.getResourceLoadCmd(m.activeTab),
+						)
 					}
 				}
-
 			case key.Matches(msg, keys.Add):
 				m.projectForm = newProjectForm()
 				m.state = stateProjectManage
@@ -760,9 +863,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				m.client = hcloud.NewClient(hcloud.WithToken(token))
-				m.state = stateLoading
-				return m, loadResources(m.client)
-
+				m.state = stateResourceView
+				// Reset loaded resources
+				m.loadedResources = make(map[resourceType]bool)
+				// Load the first tab's resources
+				return m, tea.Batch(
+					startResourceLoad(m.activeTab),
+					m.getResourceLoadCmd(m.activeTab),
+				)
 			case key.Matches(msg, keys.Quit):
 				if len(m.config.Projects) > 0 {
 					m.state = stateProjectSelect
@@ -793,21 +901,46 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, keys.Tab):
 				m.activeTab = (m.activeTab + 1) % resourceType(len(resourceTabs))
 
+				// Load resources for new tab if not already loaded
+				if !m.loadedResources[m.activeTab] {
+					return m, tea.Batch(
+						startResourceLoad(m.activeTab),
+						m.getResourceLoadCmd(m.activeTab),
+					)
+				}
 			case key.Matches(msg, keys.Reload):
 				if m.client != nil {
-					m.state = stateLoading
-					return m, loadResources(m.client)
+					// Mark current resource as not loaded and reload
+					m.loadedResources[m.activeTab] = false
+					return m, tea.Batch(
+						startResourceLoad(m.activeTab),
+						m.getResourceLoadCmd(m.activeTab),
+					)
 				}
 			case key.Matches(msg, keys.Left):
 				if m.activeTab > 0 {
 					m.activeTab--
-				}
 
+					// Load resources for new tab if not already loaded
+					if !m.loadedResources[m.activeTab] {
+						return m, tea.Batch(
+							startResourceLoad(m.activeTab),
+							m.getResourceLoadCmd(m.activeTab),
+						)
+					}
+				}
 			case key.Matches(msg, keys.Right):
 				if int(m.activeTab) < len(resourceTabs)-1 {
 					m.activeTab++
-				}
 
+					// Load resources for new tab if not already loaded
+					if !m.loadedResources[m.activeTab] {
+						return m, tea.Batch(
+							startResourceLoad(m.activeTab),
+							m.getResourceLoadCmd(m.activeTab),
+						)
+					}
+				}
 			case key.Matches(msg, keys.Quit):
 				m.state = stateProjectSelect
 			}
@@ -888,42 +1021,61 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMessage = "✅ Project configuration saved"
 		return m, clearStatusMessage()
 
-	case resourcesLoadedMsg:
-		m.state = stateResourceView
+	case resourceLoadStartMsg:
+		m.isLoading = true
+		m.loadingResource = msg.resourceType
 
-		// Create lists for each resource type
+	case serversLoadedMsg:
+		m.isLoading = false
+		m.loadedResources[resourceServers] = true
+
+		// Create server list
 		serverItems := make([]list.Item, len(msg.servers))
 		for i, server := range msg.servers {
 			serverItems[i] = serverItem{server: server}
 		}
 
+		serversList := list.New(serverItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
+		serversList.Title = "Servers"
+		m.lists[resourceServers] = serversList
+
+	case networksLoadedMsg:
+		m.isLoading = false
+		m.loadedResources[resourceNetworks] = true
+
+		// Create network list
 		networkItems := make([]list.Item, len(msg.networks))
 		for i, network := range msg.networks {
 			networkItems[i] = networkItem{network: network}
 		}
 
+		networksList := list.New(networkItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
+		networksList.Title = "Networks"
+		m.lists[resourceNetworks] = networksList
+
+	case loadBalancersLoadedMsg:
+		m.isLoading = false
+		m.loadedResources[resourceLoadBalancers] = true
+
+		// Create load balancer list
 		lbItems := make([]list.Item, len(msg.loadBalancers))
 		for i, lb := range msg.loadBalancers {
 			lbItems[i] = loadBalancerItem{lb: lb}
 		}
 
+		lbList := list.New(lbItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
+		lbList.Title = "Load Balancers"
+		m.lists[resourceLoadBalancers] = lbList
+
+	case volumesLoadedMsg:
+		m.isLoading = false
+		m.loadedResources[resourceVolumes] = true
+
+		// Create volume list
 		volumeItems := make([]list.Item, len(msg.volumes))
 		for i, volume := range msg.volumes {
 			volumeItems[i] = volumeItem{volume: volume}
 		}
-
-		// Initialize lists
-		serversList := list.New(serverItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
-		serversList.Title = "Servers"
-		m.lists[resourceServers] = serversList
-
-		networksList := list.New(networkItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
-		networksList.Title = "Networks"
-		m.lists[resourceNetworks] = networksList
-
-		lbList := list.New(lbItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
-		lbList.Title = "Load Balancers"
-		m.lists[resourceLoadBalancers] = lbList
 
 		volumesList := list.New(volumeItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		volumesList.Title = "Volumes"
@@ -1071,17 +1223,28 @@ func (m model) View() string {
 		var tabs []string
 		for i, tab := range resourceTabs {
 			if resourceType(i) == m.activeTab {
-				tabs = append(tabs, titleStyle.Render(tab))
+				// Show loading indicator in active tab if loading
+				if m.isLoading && m.loadingResource == resourceType(i) {
+					tabs = append(tabs, titleStyle.Render(tab+" (loading...)"))
+				} else {
+					tabs = append(tabs, titleStyle.Render(tab))
+				}
 			} else {
 				tabs = append(tabs, helpStyle.Render(tab))
 			}
 		}
 		tabsView := strings.Join(tabs, " ")
 
-		// Render current list
+		// Render current list or loading message
 		var listView string
-		if currentList, exists := m.lists[m.activeTab]; exists {
+		if m.isLoading && m.loadingResource == m.activeTab {
+			listView = infoStyle.Render("Loading " + strings.ToLower(resourceTabs[m.activeTab]) + "...")
+		} else if currentList, exists := m.lists[m.activeTab]; exists {
 			listView = currentList.View()
+		} else if !m.loadedResources[m.activeTab] {
+			listView = helpStyle.Render("Resources not loaded yet. Loading will start automatically.")
+		} else {
+			listView = helpStyle.Render("No " + strings.ToLower(resourceTabs[m.activeTab]) + " found.")
 		}
 
 		// Status message
