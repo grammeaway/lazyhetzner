@@ -221,6 +221,17 @@ type keyMap struct {
 	Quit   key.Binding
 	Help   key.Binding
 	Reload key.Binding
+
+	Num1 key.Binding
+	Num2 key.Binding
+	Num3 key.Binding
+	Num4 key.Binding
+	Num5 key.Binding
+	Num6 key.Binding
+	Num7 key.Binding
+	Num8 key.Binding
+	Num9 key.Binding
+	Num0 key.Binding
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
@@ -280,6 +291,51 @@ var keys = keyMap{
 		key.WithKeys("r"),
 		key.WithHelp("r", "reload resources"),
 	),
+
+	Num1: key.NewBinding(key.WithKeys("1")),
+	Num2: key.NewBinding(key.WithKeys("2")),
+	Num3: key.NewBinding(key.WithKeys("3")),
+	Num4: key.NewBinding(key.WithKeys("4")),
+	Num5: key.NewBinding(key.WithKeys("5")),
+	Num6: key.NewBinding(key.WithKeys("6")),
+	Num7: key.NewBinding(key.WithKeys("7")),
+	Num8: key.NewBinding(key.WithKeys("8")),
+	Num9: key.NewBinding(key.WithKeys("9")),
+	Num0: key.NewBinding(key.WithKeys("0")),
+}
+
+func getNumberForIndex(index int) string {
+	if index == 9 { // 10th item (0-indexed 9)
+		return "0"
+	}
+	return strconv.Itoa(index + 1)
+}
+
+func getIndexFromNumber(keyStr string) int {
+	switch keyStr {
+	case "1":
+		return 0
+	case "2":
+		return 1
+	case "3":
+		return 2
+	case "4":
+		return 3
+	case "5":
+		return 4
+	case "6":
+		return 5
+	case "7":
+		return 6
+	case "8":
+		return 7
+	case "9":
+		return 8
+	case "0":
+		return 9
+	default:
+		return -1
+	}
 }
 
 // Resource types for tabs
@@ -706,6 +762,54 @@ func clearStatusMessage() tea.Cmd {
 	})
 }
 
+func (m *model) executeContextAction(selectedAction string, server *hcloud.Server) tea.Cmd {
+	switch selectedAction {
+	case "copy_public_ip":
+		if server.PublicNet.IPv4.IP != nil {
+			return copyToClipboard(server.PublicNet.IPv4.IP.String())
+		}
+	case "show_labels":
+		if server.ID != 0 {
+			return getResourceLabels(m.client, resourceServers, server.ID)
+		}
+	case "copy_private_ip":
+		if len(server.PrivateNet) > 0 && server.PrivateNet[0].IP != nil {
+			return copyToClipboard(server.PrivateNet[0].IP.String())
+		}
+	case "ssh_tmux_window":
+		if server.PublicNet.IPv4.IP != nil {
+			return launchSSHInTmuxWindow(server.PublicNet.IPv4.IP.String())
+		}
+	case "ssh_tmux_pane":
+		if server.PublicNet.IPv4.IP != nil {
+			return launchSSHInTmuxPane(server.PublicNet.IPv4.IP.String())
+		}
+	case "ssh_zellij_tab":
+		if server.PublicNet.IPv4.IP != nil {
+			return launchSSHInZellijTab(server.PublicNet.IPv4.IP.String())
+		}
+	case "ssh_zellij_pane":
+		if server.PublicNet.IPv4.IP != nil {
+			return launchSSHInZellijPane(server.PublicNet.IPv4.IP.String())
+		}
+	case "ssh_new_terminal":
+		if server.PublicNet.IPv4.IP != nil {
+			return launchSSH(server.PublicNet.IPv4.IP.String())
+		}
+	case "ssh_current_terminal":
+		if server.PublicNet.IPv4.IP != nil {
+			// Suspend lazyhetzner and run SSH in current terminal
+			return tea.ExecProcess(exec.Command("ssh", fmt.Sprintf("root@%s", server.PublicNet.IPv4.IP.String())), func(err error) tea.Msg {
+				if err != nil {
+					return errorMsg{err}
+				}
+				return sshLaunchedMsg{}
+			})
+		}
+	}
+	return nil
+}
+
 func initialModel() model {
 	ti := textinput.New()
 	ti.Placeholder = "Enter your Hetzner Cloud API token..."
@@ -961,50 +1065,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				selectedAction := m.contextMenu.items[m.contextMenu.selectedItem].action
 				server := m.contextMenu.server
 				m.state = stateResourceView
+				return m, m.executeContextAction(selectedAction, server)
 
-				switch selectedAction {
-				case "copy_public_ip":
-					if server.PublicNet.IPv4.IP != nil {
-						return m, copyToClipboard(server.PublicNet.IPv4.IP.String())
-					}
-				case "show_labels":
-					if server.ID != 0 {
-						return m, getResourceLabels(m.client, resourceServers, server.ID)
-					}
-				case "copy_private_ip":
-					if len(server.PrivateNet) > 0 && server.PrivateNet[0].IP != nil {
-						return m, copyToClipboard(server.PrivateNet[0].IP.String())
-					}
-				case "ssh_tmux_window":
-					if server.PublicNet.IPv4.IP != nil {
-						return m, launchSSHInTmuxWindow(server.PublicNet.IPv4.IP.String())
-					}
-				case "ssh_tmux_pane":
-					if server.PublicNet.IPv4.IP != nil {
-						return m, launchSSHInTmuxPane(server.PublicNet.IPv4.IP.String())
-					}
-				case "ssh_zellij_tab":
-					if server.PublicNet.IPv4.IP != nil {
-						return m, launchSSHInZellijTab(server.PublicNet.IPv4.IP.String())
-					}
-				case "ssh_zellij_pane":
-					if server.PublicNet.IPv4.IP != nil {
-						return m, launchSSHInZellijPane(server.PublicNet.IPv4.IP.String())
-					}
-				case "ssh_new_terminal":
-					if server.PublicNet.IPv4.IP != nil {
-						return m, launchSSH(server.PublicNet.IPv4.IP.String())
-					}
-				case "ssh_current_terminal":
-					if server.PublicNet.IPv4.IP != nil {
-						// Suspend lazyhetzner and run SSH in current terminal
-						return m, tea.ExecProcess(exec.Command("ssh", fmt.Sprintf("root@%s", server.PublicNet.IPv4.IP.String())), func(err error) tea.Msg {
-							if err != nil {
-								return errorMsg{err}
-							}
-							return sshLaunchedMsg{}
-						})
-					}
+			case key.Matches(msg, keys.Num1, keys.Num2, keys.Num3, keys.Num4, keys.Num5,
+				keys.Num6, keys.Num7, keys.Num8, keys.Num9, keys.Num0):
+
+				keyStr := msg.String()
+				selectedIndex := getIndexFromNumber(keyStr)
+
+				// Check if the number corresponds to a valid menu item
+				if selectedIndex >= 0 && selectedIndex < len(m.contextMenu.items) {
+					selectedAction := m.contextMenu.items[selectedIndex].action
+					server := m.contextMenu.server
+					m.state = stateResourceView
+					return m, m.executeContextAction(selectedAction, server)
 				}
 
 			case key.Matches(msg, keys.Quit):
@@ -1289,32 +1363,37 @@ func (m model) View() string {
 			listView = currentList.View()
 		}
 
-		// Render context menu
+		// Render context menu with number shortcuts
 		var menuItems []string
 		for i, item := range m.contextMenu.items {
+			// Get the number for this item (1-indexed, with 0 for 10th)
+			numberStr := getNumberForIndex(i)
+
+			// Create the menu item with number prefix
+			menuText := fmt.Sprintf("[%s] %s", numberStr, item.label)
+
 			if i == m.contextMenu.selectedItem {
-				menuItems = append(menuItems, selectedMenuStyle.Render(item.label))
+				menuItems = append(menuItems, selectedMenuStyle.Render(menuText))
 			} else {
-				menuItems = append(menuItems, item.label)
+				menuItems = append(menuItems, menuText)
 			}
 		}
 
 		menuContent := strings.Join(menuItems, "\n")
-		menu := menuStyle.Render(fmt.Sprintf("Actions for %s:\n\n%s", m.contextMenu.server.Name, menuContent))
+
+		// Add help text about number shortcuts
+		helpText := "\nPress number keys for quick selection • ↑/↓ to navigate • Enter to select • Esc to cancel"
+		menu := menuStyle.Render(fmt.Sprintf("Actions for %s:\n\n%s%s",
+			m.contextMenu.server.Name,
+			menuContent,
+			helpStyle.Render(helpText)))
 
 		// Center the menu
-		menuHeight := strings.Count(menu, "\n") + 1
-		menuWidth := 40 // Approximate width
-		_ = menuHeight  // Suppress unused variable warning
-		_ = menuWidth   // Suppress unused variable warning
-
-		// Position menu overlay
 		menuOverlay := lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, menu)
 
 		background := fmt.Sprintf("%s\n%s\n\n%s", infoStyle.Render(projectHeader), tabsView, listView)
 
 		return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, background) + menuOverlay
-
 	case stateError:
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n\n%s\n",
