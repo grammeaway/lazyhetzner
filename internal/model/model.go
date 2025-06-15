@@ -48,6 +48,10 @@ const (
 	ResourceVolumes
 )
 
+
+
+var resourceTabs = []string{"Servers", "Networks", "Load Balancers", "Volumes"}
+
 func (m *Model) getResourceLoadCmd(rt ResourceType) tea.Cmd {
 	if m.client == nil {
 		return nil

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -22,7 +21,6 @@ import (
 
 
 
-var resourceTabs = []string{"Servers", "Networks", "Load Balancers", "Volumes"}
 
 // Project list item
 type projectItem struct {
@@ -311,13 +309,12 @@ func initialModel() model.Model {
 	loadedResources := make(map[model.ResourceType]bool)
 
 	return model.Model{
-		state:           stateProjectSelect,
-		tokenInput:      ti,
-		lists:           lists,
-		help:            help.New(),
-		sessionInfo:     detectSession(),
-		loadedResources: loadedResources,
-		isLoading:       false,
+		State:           model.StateProjectSelect,
+		TokenInput:      ti,
+		Lists:           lists,
+		Help:            help.New(),
+		LoadedResources: loadedResources,
+		IsLoading:       false,
 	}
 }
 
