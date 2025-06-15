@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"lazyhetzner/internal/message"
 	"github.com/atotto/clipboard"
@@ -12,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"lazyhetzner/internal/model"
+	"lazyhetzner/internal/resource"
 )
 
 
@@ -33,8 +33,8 @@ func initialModel() model.Model {
 	ti.CharLimit = 64
 	ti.Width = 50
 
-	lists := make(map[model.ResourceType]list.Model)
-	loadedResources := make(map[model.ResourceType]bool)
+	lists := make(map[resource.ResourceType]list.Model)
+	loadedResources := make(map[resource.ResourceType]bool)
 
 	return model.Model{
 		State:           model.StateProjectSelect,
