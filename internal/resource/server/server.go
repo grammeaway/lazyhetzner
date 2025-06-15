@@ -36,7 +36,8 @@ func (i ServerItem) Description() string {
 	} else {
 		statusDisplay = "🔴 " + string(i.Server.Status)
 	}
-	return fmt.Sprintf("%s | %s | %s", statusDisplay, i.Server.ServerType.Name, i.Server.PublicNet.IPv4.IP.String())
+	return fmt.Sprintf("%s | %s | %s | %s", statusDisplay, i.Server.ServerType.Name, i.Server.PublicNet.IPv4.IP.String(), i.Server.PrivateNet[0].IP.String())
+
 }
 
 
