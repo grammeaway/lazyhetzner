@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/hetznercloud/hcloud-go/hcloud"
 	"context"
+	util "lazyhetzner/utility"
 )
 
 
@@ -37,7 +38,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateProjectList()
 		}
 
-		// Update form inputs
+		// Update form.Inputs
 		for i := range m.projectForm.Inputs {
 			m.projectForm.Inputs[i].Width = min(50, msg.Width-10)
 		}
@@ -74,9 +75,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if projectItem, ok := selectedItem.(projectItem); ok {
 						m.client = hcloud.NewClient(hcloud.WithToken(projectItem.config.Token))
 						m.currentProject = projectItem.config.Name
-						m.state = stateResourceView
+						m.State = stateResourceView
 						// Reset loaded resources for new project
-						m.loadedResources = make(map[ResourceType]bool)
+						m.LoadedResources = make(map[ResourceType]bool)
 						// Load the first tab's resources
 						return m, tea.Batch(
 							startResourceLoad(m.activeTab),
@@ -86,7 +87,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case key.Matches(msg, keys.Add):
 				m.projectForm = project.NewProjectForm()
-				m.state = stateProjectManage
+				m.State = stateProjectManage
 
 			case key.Matches(msg, keys.Delete):
 				if selectedItem := m.projectList.SelectedItem(); selectedItem != nil {
@@ -121,26 +122,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if name != "" && token != "" {
 					m.config.AddProject(name, token)
 					m.updateProjectList()
-					m.state = stateProjectSelect
+					m.State = stateProjectSelect
 					return m, saveConfigCmd(m.config)
 				}
 
 			case key.Matches(msg, keys.Quit):
-				m.state = stateProjectSelect
+				m.State = stateProjectSelect
 			}
 
 		case stateTokenInput:
 			switch {
 			case key.Matches(msg, keys.Enter):
-				token := strings.TrimSpace(m.tokenInput.Value())
+				token := strings.TrimSpace(m.TokenInput.Value())
 				if token == "" {
 					return m, nil
 				}
 
 				m.client = hcloud.NewClient(hcloud.WithToken(token))
-				m.state = stateResourceView
+				m.State = stateResourceView
 				// Reset loaded resources
-				m.loadedResources = make(map[ResourceType]bool)
+				m.LoadedResources = make(map[ResourceType]bool)
 				// Load the first tab's resources
 				return m, tea.Batch(
 					startResourceLoad(m.activeTab),
@@ -148,7 +149,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				)
 			case key.Matches(msg, keys.Quit):
 				if len(m.config.Projects) > 0 {
-					m.state = stateProjectSelect
+					m.State = stateProjectSelect
 				} else {
 					return m, tea.Quit
 				}
@@ -159,21 +160,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, keys.Enter):
 				// Show context menu for servers
 				if m.activeTab == resourceServers {
-					if currentList, exists := m.lists[resourceServers]; exists {
+					if currentList, exists := m.Lists[resourceServers]; exists {
 						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
 							if serverItem, ok := selectedItem.(serverItem); ok {
 								m.contextMenu = ctm_serv.CreateServerContextMenu(serverItem.server) 
-								m.state = stateContextMenu
+								m.State = stateContextMenu
 							}
 						}
 					}
 				}
 
 			case key.Matches(msg, keys.Tab):
-				m.activeTab = (m.activeTab + 1) % resourceType(len(resourceTabs))
+				m.activeTab = (m.activeTab + 1) % ResourceType(len(resourceTabs))
 
 				// Load resources for new tab if not already loaded
-				if !m.loadedResources[m.activeTab] {
+				if !m.LoadedResources[m.activeTab] {
 					return m, tea.Batch(
 						startResourceLoad(m.activeTab),
 						m.getResourceLoadCmd(m.activeTab),
@@ -182,7 +183,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, keys.Reload):
 				if m.client != nil {
 					// Mark current resource as not loaded and reload
-					m.loadedResources[m.activeTab] = false
+					m.LoadedResources[m.activeTab] = false
 					return m, tea.Batch(
 						startResourceLoad(m.activeTab),
 						m.getResourceLoadCmd(m.activeTab),
@@ -193,7 +194,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.activeTab--
 
 					// Load resources for new tab if not already loaded
-					if !m.loadedResources[m.activeTab] {
+					if !m.LoadedResources[m.activeTab] {
 						return m, tea.Batch(
 							startResourceLoad(m.activeTab),
 							m.getResourceLoadCmd(m.activeTab),
@@ -205,7 +206,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.activeTab++
 
 					// Load resources for new tab if not already loaded
-					if !m.loadedResources[m.activeTab] {
+					if !m.LoadedResources[m.activeTab] {
 						return m, tea.Batch(
 							startResourceLoad(m.activeTab),
 							m.getResourceLoadCmd(m.activeTab),
@@ -213,7 +214,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			case key.Matches(msg, keys.Quit):
-				m.state = stateProjectSelect
+				m.State = stateProjectSelect
 			}
 
 		case stateContextMenu:
@@ -231,25 +232,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, keys.Enter):
 				selectedAction := m.contextMenu.Items[m.contextMenu.SelectedItem].Action
 				server := m.contextMenu.Server
-				m.state = stateResourceView
+				m.State = stateResourceView
 				return m, m.executeContextAction(selectedAction, server)
 
 			case key.Matches(msg, keys.Num1, keys.Num2, keys.Num3, keys.Num4, keys.Num5,
 				keys.Num6, keys.Num7, keys.Num8, keys.Num9, keys.Num0):
 
 				keyStr := msg.String()
-				selectedIndex := getIndexFromNumber(keyStr)
+				selectedIndex := util.GetIndexFromNumber(keyStr)
 
 				// Check if the number corresponds to a valid menu item
 				if selectedIndex >= 0 && selectedIndex < len(m.contextMenu.Items) {
 					selectedAction := m.contextMenu.Items[selectedIndex].Action
 					server := m.contextMenu.Server
-					m.state = stateResourceView
+					m.State = stateResourceView
 					return m, m.executeContextAction(selectedAction, server)
 				}
 
 			case key.Matches(msg, keys.Quit):
-				m.state = stateResourceView
+				m.State = stateResourceView
 			}
 
 		case stateError:
@@ -263,12 +264,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, clearStatusMessage()
 
 	case resourceLoadStartMsg:
-		m.isLoading = true
+		m.IsLoading = true
 		m.loadingResource = msg.resourceType
 
 	case serversLoadedMsg:
-		m.isLoading = false
-		m.loadedResources[resourceServers] = true
+		m.IsLoading = false
+		m.LoadedResources[resourceServers] = true
 
 		// Create server list
 		serverItems := make([]list.Item, len(msg.servers))
@@ -278,11 +279,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		serversList := list.New(serverItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		serversList.Title = "Servers"
-		m.lists[resourceServers] = serversList
+		m.Lists[resourceServers] = serversList
 
 	case networksLoadedMsg:
-		m.isLoading = false
-		m.loadedResources[resourceNetworks] = true
+		m.IsLoading = false
+		m.LoadedResources[resourceNetworks] = true
 
 		// Create network list
 		networkItems := make([]list.Item, len(msg.networks))
@@ -292,11 +293,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		networksList := list.New(networkItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		networksList.Title = "Networks"
-		m.lists[resourceNetworks] = networksList
+		m.Lists[resourceNetworks] = networksList
 
 	case loadBalancersLoadedMsg:
-		m.isLoading = false
-		m.loadedResources[resourceLoadBalancers] = true
+		m.IsLoading = false
+		m.LoadedResources[resourceLoadBalancers] = true
 
 		// Create load balancer list
 		lbItems := make([]list.Item, len(msg.loadBalancers))
@@ -306,11 +307,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		lbList := list.New(lbItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		lbList.Title = "Load Balancers"
-		m.lists[resourceLoadBalancers] = lbList
+		m.Lists[resourceLoadBalancers] = lbList
 
 	case volumesLoadedMsg:
-		m.isLoading = false
-		m.loadedResources[resourceVolumes] = true
+		m.IsLoading = false
+		m.LoadedResources[resourceVolumes] = true
 
 		// Create volume list
 		volumeItems := make([]list.Item, len(msg.volumes))
@@ -320,7 +321,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		volumesList := list.New(volumeItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		volumesList.Title = "Volumes"
-		m.lists[resourceVolumes] = volumesList
+		m.Lists[resourceVolumes] = volumesList
 
 	case message.ClipboardCopiedMsg:
 		m.statusMessage = fmt.Sprintf("✅ Copied %s to clipboard", string(msg))
@@ -341,33 +342,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMessage = string(msg)
 
 	case message.ErrorMsg:
-		m.state = stateError
-		m.err = msg.err
+		m.State = stateError
+		m.err = msg.Err
 	}
 
 	// Update components
-	if m.state == stateTokenInput {
+	if m.State == stateTokenInput {
 		var cmd tea.Cmd
-		m.tokenInput, cmd = m.tokenInput.Update(msg)
+		m.TokenInput, cmd = m.TokenInput.Update(msg)
 		return m, cmd
 	}
 
-	if m.state == stateProjectSelect && m.config != nil {
+	if m.State == stateProjectSelect && m.config != nil {
 		var cmd tea.Cmd
 		m.projectList, cmd = m.projectList.Update(msg)
 		return m, cmd
 	}
 
-	if m.state == stateProjectManage {
+	if m.State == stateProjectManage {
 		var cmd tea.Cmd
-		m.projectForm.inputs[m.projectForm.focusIdx], cmd = m.projectForm.inputs[m.projectForm.focusIdx].Update(msg)
+		m.projectForm.Inputs[m.projectForm.FocusIdx], cmd = m.projectForm.Inputs[m.projectForm.FocusIdx].Update(msg)
 		return m, cmd
 	}
 
-	if m.state == stateResourceView {
-		if currentList, exists := m.lists[m.activeTab]; exists {
+	if m.State == stateResourceView {
+		if currentList, exists := m.Lists[m.activeTab]; exists {
 			var cmd tea.Cmd
-			m.lists[m.activeTab], cmd = currentList.Update(msg)
+			m.Lists[m.activeTab], cmd = currentList.Update(msg)
 			return m, cmd
 		}
 	}
