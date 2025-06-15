@@ -163,7 +163,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
 							if serverItem, ok := selectedItem.(serverItem); ok {
 								m.contextMenu = ctm_serv.CreateServerContextMenu(serverItem.server) 
-							}
 								m.state = stateContextMenu
 							}
 						}

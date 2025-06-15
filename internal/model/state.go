@@ -3,7 +3,7 @@ package model
 type state int
 
 const (
-	stateProjectSelect state = iota
+	StateProjectSelect state = iota
 	stateProjectManage
 	stateTokenInput
 	stateLoading

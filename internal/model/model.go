@@ -18,24 +18,24 @@ import (
 
 // Main model
 type Model struct {
-	state           state
+	State           state
 	config          *config.Config
-	tokenInput      textinput.Model
+	TokenInput      textinput.Model
 	projectForm     input_form.InputForm
 	projectList     list.Model
 	client          *hcloud.Client
 	currentProject  string
 	activeTab       ResourceType
-	lists           map[ResourceType]list.Model
+	Lists           map[ResourceType]list.Model
 	contextMenu     ctm.ContextMenu
-	help            help.Model
+	Help            help.Model
 	err             error
 	width           int
 	height          int
 	statusMessage   string
-	loadedResources map[ResourceType]bool
+	LoadedResources map[ResourceType]bool
 	loadingResource ResourceType
-	isLoading       bool
+	IsLoading       bool
 }
 
 // Resource types for tabs
