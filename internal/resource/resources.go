@@ -1,4 +1,4 @@
-package resources
+package resource
 
 
 import ( 
@@ -11,6 +11,24 @@ import (
 	"strings"
 	"lazyhetzner/internal/message"
 )
+
+
+
+
+type ResourceType int
+
+const (
+	ResourceServers ResourceType = iota
+	ResourceNetworks
+	ResourceLoadBalancers
+	ResourceVolumes
+)
+
+
+
+
+
+
 func loadResources(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
@@ -56,27 +74,29 @@ type resourcesLoadedMsg struct {
 
 
 type resourceLoadStartMsg struct {
-	resourceType model.ResourceType
+	resourceType ResourceType
 }
 
 
 
 
-func startResourceLoad(rt model.ResourceType) tea.Cmd {
+func startResourceLoad(rt ResourceType) tea.Cmd {
 	return func() tea.Msg {
 		return resourceLoadStartMsg{resourceType: rt}
 	}
 }
 
 
-func getResourceLabels(client *hcloud.Client, resourceType model.ResourceType, resourceID int) tea.Cmd {
+
+
+func getResourceLabels(client *hcloud.Client, resourceType ResourceType, resourceID int) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 
 		var labels map[string]string
 
 		switch resourceType {
-		case model.ResourceServers:
+		case ResourceServers:
 			server, _, err := client.Server.Get(ctx, strconv.Itoa(resourceID))
 			if err != nil {
 				return message.ErrorMsg{err}
@@ -86,7 +106,7 @@ func getResourceLabels(client *hcloud.Client, resourceType model.ResourceType, r
 			}
 			labels = server.Labels
 
-		case model.ResourceNetworks:
+		case ResourceNetworks:
 			network, _, err := client.Network.Get(ctx, strconv.Itoa(resourceID))
 			if err != nil {
 				return message.ErrorMsg{err}
@@ -96,7 +116,7 @@ func getResourceLabels(client *hcloud.Client, resourceType model.ResourceType, r
 			}
 			labels = network.Labels
 
-		case model.ResourceLoadBalancers:
+		case ResourceLoadBalancers:
 			lb, _, err := client.LoadBalancer.Get(ctx, strconv.Itoa(resourceID))
 			if err != nil {
 				return message.ErrorMsg{err}
@@ -106,7 +126,7 @@ func getResourceLabels(client *hcloud.Client, resourceType model.ResourceType, r
 			}
 			labels = lb.Labels
 
-		case model.ResourceVolumes:
+		case ResourceVolumes:
 			volume, _, err := client.Volume.Get(ctx, strconv.Itoa(resourceID))
 			if err != nil {
 				return message.ErrorMsg{err}

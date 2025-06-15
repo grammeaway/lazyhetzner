@@ -13,6 +13,7 @@ import (
 
 	"lazyhetzner/internal/input_form"
 	"lazyhetzner/internal/message"
+	"lazyhetzner/internal/resource"
 	"context"
 )
 
@@ -25,46 +26,36 @@ type Model struct {
 	projectList     list.Model
 	client          *hcloud.Client
 	currentProject  string
-	activeTab       ResourceType
-	Lists           map[ResourceType]list.Model
+	activeTab       resource.ResourceType
+	Lists           map[resource.ResourceType]list.Model
 	contextMenu     ctm.ContextMenu
 	Help            help.Model
 	err             error
 	width           int
 	height          int
 	statusMessage   string
-	LoadedResources map[ResourceType]bool
-	loadingResource ResourceType
+	LoadedResources map[resource.ResourceType]bool
+	loadingResource resource.ResourceType
 	IsLoading       bool
 }
 
 // Resource types for tabs
-type ResourceType int
-
-const (
-	ResourceServers ResourceType = iota
-	ResourceNetworks
-	ResourceLoadBalancers
-	ResourceVolumes
-)
-
-
 
 var resourceTabs = []string{"Servers", "Networks", "Load Balancers", "Volumes"}
 
-func (m *Model) getResourceLoadCmd(rt ResourceType) tea.Cmd {
+func (m *Model) getResourceLoadCmd(rt resource.ResourceType) tea.Cmd {
 	if m.client == nil {
 		return nil
 	}
 
 	switch rt {
-	case ResourceServers:
+	case resource.ResourceServers:
 		return loadServers(m.client)
-	case ResourceNetworks:
+	case resource.ResourceNetworks:
 		return loadNetworks(m.client)
-	case ResourceLoadBalancers:
+	case resource.ResourceLoadBalancers:
 		return loadLoadBalancers(m.client)
-	case ResourceVolumes:
+	case resource.ResourceVolumes:
 		return loadVolumes(m.client)
 	default:
 		return nil
