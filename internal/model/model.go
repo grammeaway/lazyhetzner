@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/hetznercloud/hcloud-go/hcloud"
-
+	"github.com/atotto/clipboard"
 	"lazyhetzner/internal/input_form"
 	"lazyhetzner/internal/message"
 	"lazyhetzner/internal/resource"
@@ -70,6 +70,15 @@ func (m *Model) getResourceLoadCmd(rt resource.ResourceType) tea.Cmd {
 
 
 
+func copyToClipboard(text string) tea.Cmd {
+	return func() tea.Msg {
+		err := clipboard.WriteAll(text)
+		if err != nil {
+			return message.ErrorMsg{err}
+		}
+		return message.ClipboardCopiedMsg(text)
+	}
+}
 
 func clearStatusMessage() tea.Cmd {
 	return tea.Tick(time.Second*3, func(t time.Time) tea.Msg {

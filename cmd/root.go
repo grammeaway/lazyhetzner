@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"lazyhetzner/internal/message"
-	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -15,15 +13,6 @@ import (
 )
 
 
-func copyToClipboard(text string) tea.Cmd {
-	return func() tea.Msg {
-		err := clipboard.WriteAll(text)
-		if err != nil {
-			return message.ErrorMsg{err}
-		}
-		return message.ClipboardCopiedMsg(text)
-	}
-}
 
 
 func initialModel() model.Model {
