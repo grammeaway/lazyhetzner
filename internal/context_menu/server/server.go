@@ -2,16 +2,17 @@ package server
 
 import (
 	"fmt"
+	"github.com/atotto/clipboard"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/hetznercloud/hcloud-go/hcloud"
+	ctm "lazyhetzner/internal/context_menu"
+	"lazyhetzner/internal/message"
+	"lazyhetzner/internal/resource"
+	"lazyhetzner/internal/resource/label"
 	"os"
 	"os/exec"
-	"strings"
 	"runtime"
-	tea "github.com/charmbracelet/bubbletea"
- 	"lazyhetzner/internal/message"
-	ctm "lazyhetzner/internal/context_menu"
-	"github.com/hetznercloud/hcloud-go/hcloud"
-	"github.com/atotto/clipboard"
-	"lazyhetzner/internal/resource"
+	"strings"
 )
 
 // SessionType represents the type of terminal multiplexer session
@@ -22,7 +23,6 @@ const (
 	SessionTmux
 	SessionZellij
 )
-
 
 // SSH Action messages
 type SshLaunchedMsg struct{}
@@ -49,7 +49,7 @@ func detectSession() SessionInfo {
 		info.SessionName = os.Getenv("TMUX_SESSION")
 		info.WindowName = os.Getenv("TMUX_WINDOW")
 		info.PaneName = os.Getenv("TMUX_PANE")
-		
+
 		// If session name is empty, try to get it via tmux command
 		if info.SessionName == "" {
 			if cmd := exec.Command("tmux", "display-message", "-p", "#S"); cmd != nil {
@@ -71,9 +71,12 @@ func detectSession() SessionInfo {
 	return info
 }
 
-// getSSHMenuItems returns context menu Items based on the current session
-func getSSHMenuItems(sessionInfo SessionInfo) []ctm.ContextMenuItem {
+// Returns context menu Items for servers
+func getServerMenuItems(sessionInfo SessionInfo) []ctm.ContextMenuItem {
 	baseItems := []ctm.ContextMenuItem{
+		// add action for canceling (i.e., closing) the context menu
+		{Label: "❌ Cancel", Action: "cancel"},
+		{Label: "🔖 View Labels", Action: "view_labels"},
 		{Label: "📋 Copy Public IP", Action: "copy_public_ip"},
 		{Label: "📋 Copy Private IP", Action: "copy_private_ip"},
 	}
@@ -152,7 +155,6 @@ func launchSSH(ip string) tea.Cmd {
 	}
 }
 
-
 // launchSSHInTmuxWindow launches SSH in a new tmux window
 func launchSSHInTmuxWindow(ip string) tea.Cmd {
 	return func() tea.Msg {
@@ -222,12 +224,18 @@ func launchSSHInSameTerminal(ip string) tea.Cmd {
 	})
 }
 
-
+func getServerLabels(server *hcloud.Server) map[string]string {
+	labels := make(map[string]string)
+	for key, value := range server.Labels {
+		labels[key] = value
+	}
+	return labels
+}
 
 func CreateServerContextMenu(server *hcloud.Server) ctm.ContextMenu {
 	sessionInfo := detectSession()
 	return ctm.ContextMenu{
-		Items:        getSSHMenuItems(sessionInfo),
+		Items:        getServerMenuItems(sessionInfo),
 		SelectedItem: 0,
 		ResourceType: resource.ResourceServers,
 		ResourceID:   server.ID,
@@ -261,7 +269,6 @@ func handleSSHAction(Action string, server *hcloud.Server, sessionInfo SessionIn
 	}
 }
 
-
 func ExecuteServerContextAction(selectedAction string, server *hcloud.Server) tea.Cmd {
 	sessionInfo := detectSession()
 
@@ -272,6 +279,24 @@ func ExecuteServerContextAction(selectedAction string, server *hcloud.Server) te
 
 	// Handle other actions here if needed
 	switch selectedAction {
+	case "cancel":
+		return func() tea.Msg {
+			return message.CancelCtxMenuMsg{}
+		}
+	case "view_labels":
+		labels := getServerLabels(server)
+		if len(labels) == 0 {
+			return func() tea.Msg {
+				return message.StatusMsg("No labels found for this server.")
+			}
+		}
+		return func() tea.Msg {
+			return label.LabelsLoadedMsg{
+				Labels:              labels,
+				RelatedResourceName: fmt.Sprintf("Server: %s", server.Name),
+				RelatedResourceType: resource.ResourceServers,
+			}
+		}
 	case "copy_public_ip":
 		return func() tea.Msg {
 			if server.PublicNet.IPv4.IP == nil {

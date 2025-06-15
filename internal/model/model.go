@@ -8,10 +8,10 @@ import (
 	"lazyhetzner/internal/config"
 	ctm "lazyhetzner/internal/context_menu"
 	ctm_serv "lazyhetzner/internal/context_menu/server"
+	ctm_n "lazyhetzner/internal/context_menu/network"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/hetznercloud/hcloud-go/hcloud"
-	"github.com/atotto/clipboard"
 	"lazyhetzner/internal/input_form"
 	"lazyhetzner/internal/message"
 	"lazyhetzner/internal/resource"
@@ -44,6 +44,8 @@ type Model struct {
 	LoadedResources map[resource.ResourceType]bool
 	loadingResource resource.ResourceType
 	IsLoading       bool
+	loadedLabels map[string]string
+	labelsPertainingToResource string
 }
 
 // Resource types for tabs
@@ -66,18 +68,6 @@ func (m *Model) getResourceLoadCmd(rt resource.ResourceType) tea.Cmd {
 		return r_vol.LoadVolumes(m.client)
 	default:
 		return nil
-	}
-}
-
-
-
-func copyToClipboard(text string) tea.Cmd {
-	return func() tea.Msg {
-		err := clipboard.WriteAll(text)
-		if err != nil {
-			return message.ErrorMsg{err}
-		}
-		return message.ClipboardCopiedMsg(text)
 	}
 }
 
@@ -104,7 +94,21 @@ func (m *Model) executeContextAction(selectedAction string, resourceType resourc
 		}
 
 		return ctm_serv.ExecuteServerContextAction(selectedAction, server)
+	case resource.ResourceNetworks:
+		network, _, err := m.client.Network.Get(context.Background(), strconv.Itoa(resourceID))
+		if err != nil {
+			return func() tea.Msg {
+				return message.ErrorMsg{err}
+			}
+		}
+		if network == nil {
+			return func() tea.Msg {
+				return message.ErrorMsg{fmt.Errorf("network with ID %d not found", resourceID)}
+			}
+		}
+		return ctm_n.ExecuteNetworkContextAction(selectedAction, network)
 	}
+
 	return nil
 }
 

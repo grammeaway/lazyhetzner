@@ -8,6 +8,7 @@ const (
 	stateTokenInput
 	stateLoading
 	stateResourceView
+	stateLabelView
 	stateContextMenu
 	stateError
 )

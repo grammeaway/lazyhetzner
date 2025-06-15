@@ -3,9 +3,9 @@ package model
 import (
 	"fmt"
 	"github.com/charmbracelet/lipgloss"
-	"strings"
-	util "lazyhetzner/utility"
 	"lazyhetzner/internal/resource"
+	util "lazyhetzner/utility"
+	"strings"
 )
 
 func (m Model) View() string {
@@ -69,7 +69,6 @@ func (m Model) View() string {
 			titleStyle.Render("lazyhetzner - Add Project"),
 			formView.String(),
 		)
-
 	case stateTokenInput:
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n\n%s\n\n%s\n",
@@ -141,6 +140,63 @@ func (m Model) View() string {
 			helpStyle.Render(helpText),
 		)
 
+	case stateLabelView:
+		// Render the label View
+		var labelView strings.Builder
+		labelView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("Labels")))
+
+		// Resource info with better styling
+		resourceInfo := fmt.Sprintf("📋 Labels for %s", m.labelsPertainingToResource)
+		labelView.WriteString(infoStyle.Render(resourceInfo) + "\n\n")
+
+		if len(m.loadedLabels) == 0 {
+			// Enhanced no labels message
+			noLabelsMsg := "⚠️  No labels found for this resource"
+			labelView.WriteString(noLabelsStyle.Render(noLabelsMsg) + "\n")
+		} else {
+			// Create a container for all labels
+			var labelsContent strings.Builder
+			labelsContent.WriteString(fmt.Sprintf("Found %d label(s):\n\n", len(m.loadedLabels)))
+
+			// Sort keys for consistent display (optional)
+			keys := make([]string, 0, len(m.loadedLabels))
+			for k := range m.loadedLabels {
+				keys = append(keys, k)
+			}
+
+			// Render each label with improved styling
+			for i, key := range keys {
+				value := m.loadedLabels[key]
+
+				// Create a styled key-value pair
+				keyStyled := labelKeyStyle.Render("🏷️  " + key)
+				valueStyled := labelValueStyle.Render(value)
+
+				// Join key and value with some spacing
+				labelPair := lipgloss.JoinHorizontal(
+					lipgloss.Center,
+					keyStyled,
+					" → ",
+					valueStyled,
+				)
+
+				labelsContent.WriteString(labelPair)
+
+				// Add spacing between labels (except for the last one)
+				if i < len(keys)-1 {
+					labelsContent.WriteString("\n\n")
+				}
+			}
+
+			// Wrap all labels in a container
+			labelView.WriteString(labelContainerStyle.Render(labelsContent.String()) + "\n")
+		}
+
+		// Enhanced help text
+		helpText := "💡 Press 'q' to return to resource view"
+		labelView.WriteString("\n" + helpStyle.Render(helpText))
+
+		return labelView.String()
 	case stateContextMenu:
 		// Render the current resource view in background
 		projectHeader := fmt.Sprintf("Project: %s", m.currentProject)
