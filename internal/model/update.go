@@ -26,11 +26,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 
 		// Update list sizes
-		for rt := range m.lists {
-			l := m.lists[rt]
+		for rt := range m.Lists {
+			l := m.Lists[rt]
 			l.SetWidth(msg.Width - 4)
 			l.SetHeight(msg.Height - 10)
-			m.lists[rt] = l
+			m.Lists[rt] = l
 		}
 
 		if m.config != nil {
@@ -38,8 +38,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Update form inputs
-		for i := range m.projectForm.inputs {
-			m.projectForm.inputs[i].Width = min(50, msg.Width-10)
+		for i := range m.projectForm.Inputs {
+			m.projectForm.Inputs[i].Width = min(50, msg.Width-10)
 		}
 
 	case configLoadedMsg:
@@ -52,7 +52,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if project != nil {
 				m.client = hcloud.NewClient(hcloud.WithToken(project.Token))
 				m.currentProject = project.Name
-				m.state = stateResourceView
+				m.State = stateResourceView
 				// Load the first tab's resources
 				return m, tea.Batch(
 					startResourceLoad(m.activeTab),
@@ -63,10 +63,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// If no projects, go to token input
 		if len(m.config.Projects) == 0 {
-			m.state = stateTokenInput
+			m.State = stateTokenInput
 		}
 	case tea.KeyMsg:
-		switch m.state {
+		switch m.State {
 		case stateProjectSelect:
 			switch {
 			case key.Matches(msg, keys.Enter):
