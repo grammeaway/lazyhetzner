@@ -1,7 +1,10 @@
 package project 
 
 
-
+import (
+	"fmt"
+	"lazyhetzner/internal/config"
+)
 
 // Project list item
 type projectItem struct {

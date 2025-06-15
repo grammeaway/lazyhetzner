@@ -1,6 +1,16 @@
 package resources
 
 
+import ( 
+
+	"github.com/hetznercloud/hcloud-go/hcloud"
+	tea "github.com/charmbracelet/bubbletea"
+	"context"
+	"fmt"
+	"strconv"
+	"strings"
+	"lazyhetzner/internal/message"
+)
 func loadResources(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()

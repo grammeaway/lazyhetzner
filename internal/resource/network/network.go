@@ -1,7 +1,12 @@
 package network
 
-
-
+import (
+	"context"
+	"fmt"
+	"github.com/hetznercloud/hcloud-go/hcloud"
+	"lazyhetzner/internal/message"
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 type networksLoadedMsg struct {
 	networks []*hcloud.Network

@@ -1,12 +1,16 @@
 package volume
 
-
+import (
+	"context"
+	"fmt"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/hetznercloud/hcloud-go/hcloud"
+	"lazyhetzner/internal/message"
+)
 
 type volumesLoadedMsg struct {
 	volumes []*hcloud.Volume
 }
-
-
 
 type volumeItem struct {
 	volume *hcloud.Volume
@@ -21,8 +25,6 @@ func (i volumeItem) Description() string {
 	}
 	return fmt.Sprintf("%s | %dGB | %s", status, i.volume.Size, i.volume.Location.Name)
 }
-
-
 
 func loadVolumes(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
