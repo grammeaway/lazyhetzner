@@ -36,6 +36,7 @@ func GetResourceNameFromType(rt ResourceType) string {
 	}
 }
 
+
 func loadResources(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()

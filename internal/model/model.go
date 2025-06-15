@@ -1,7 +1,6 @@
 package model
 
 import (
-	"fmt"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"strconv"
@@ -102,6 +101,7 @@ func (m *Model) executeContextAction(selectedAction string, resourceType resourc
 				return message.ErrorMsg{fmt.Errorf("server with ID %d not found", resourceID)}
 			}
 		}
+
 		return ctm_serv.ExecuteServerContextAction(selectedAction, server)
 	}
 	return nil
