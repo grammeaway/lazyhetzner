@@ -1,4 +1,4 @@
-module lazyhetzner.com
+module lazyhetzner
 
 go 1.24.4
 
