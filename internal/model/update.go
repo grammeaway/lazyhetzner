@@ -1,3 +1,4 @@
+
 package model 
 
 import (
@@ -20,7 +21,6 @@ import (
 	r_n "lazyhetzner/internal/resource/network"
 	r_label "lazyhetzner/internal/resource/label"
 )
-
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -69,6 +69,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.State = stateTokenInput
 		}
 	case tea.KeyMsg:
+		// Handle global quit first - only quit the entire app from specific states
+		if key.Matches(msg, keys.Quit) {
+			switch m.State {
+			case StateProjectSelect:
+				// Only quit the entire application from project select
+				return m, tea.Quit
+			case stateTokenInput:
+				// From token input, go back to project select if projects exist, otherwise quit
+				if len(m.config.Projects) > 0 {
+					m.State = StateProjectSelect
+					return m, nil
+				} else {
+					return m, tea.Quit
+				}
+			case stateError:
+				// Quit from error state
+				return m, tea.Quit
+			case stateLabelView:
+				// From label view, go back to resource view
+				m.State = stateResourceView
+				return m, nil
+			case stateResourceView:
+				// From resource view, go back to project select
+				m.State = StateProjectSelect
+				return m, nil
+			case stateProjectManage:
+				// From project manage, go back to project select
+				m.State = StateProjectSelect
+				return m, nil
+			case stateContextMenu:
+				// From context menu, go back to resource view
+				m.State = stateResourceView
+				return m, nil
+			}
+		}
+
+		// Handle state-specific keys (excluding quit, which is handled above)
 		switch m.State {
 		case StateProjectSelect:
 			switch {
@@ -99,9 +136,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, config.SaveConfigCmd(m.config)
 					}
 				}
-
-			case key.Matches(msg, keys.Quit):
-				return m, tea.Quit
 			}
 
 		case stateProjectManage:
@@ -127,9 +161,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.State = StateProjectSelect
 					return m, config.SaveConfigCmd(m.config)
 				}
-
-			case key.Matches(msg, keys.Quit):
-				m.State = StateProjectSelect
 			}
 
 		case stateTokenInput:
@@ -149,12 +180,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					resource.StartResourceLoad(m.activeTab),
 					m.getResourceLoadCmd(m.activeTab),
 				)
-			case key.Matches(msg, keys.Quit):
-				if len(m.config.Projects) > 0 {
-					m.State = StateProjectSelect
-				} else {
-					return m, tea.Quit
-				}
 			}
 
 		case stateResourceView:
@@ -215,14 +240,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						)
 					}
 				}
-			case key.Matches(msg, keys.Quit):
-				m.State = StateProjectSelect
 			}
+
 		case stateLabelView:
-			switch {
-			case key.Matches(msg, keys.Quit):
-				m.State = stateResourceView
-			}
+			// Label view specific keys (quit is handled globally above)
+			// Add any other label view specific key handling here
+			break
+
 		case stateContextMenu:
 			switch {
 			case key.Matches(msg, keys.Up):
@@ -240,7 +264,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.State = stateResourceView
 				return m, m.executeContextAction(selectedAction, m.contextMenu.ResourceType, m.contextMenu.ResourceID) 
 
-
 			case key.Matches(msg, keys.Num1, keys.Num2, keys.Num3, keys.Num4, keys.Num5,
 				keys.Num6, keys.Num7, keys.Num8, keys.Num9, keys.Num0):
 
@@ -250,20 +273,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Check if the number corresponds to a valid menu item
 				if selectedIndex >= 0 && selectedIndex < len(m.contextMenu.Items) {
 					selectedAction := m.contextMenu.Items[selectedIndex].Action
-
 					m.State = stateResourceView
 					return m, m.executeContextAction(selectedAction, m.contextMenu.ResourceType, m.contextMenu.ResourceID)
-
 				}
-
-			case key.Matches(msg, keys.Quit):
-				m.State = stateResourceView
 			}
 
 		case stateError:
-			if key.Matches(msg, keys.Quit) {
-				return m, tea.Quit
-			}
+			// Error state - quit is handled globally above
+			break
 		}
 
 	case config.ProjectSavedMsg:
@@ -285,9 +302,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Server: server,
 				ResourceType: resource.ResourceServers,
 				ResourceID:   server.ID,
-
 			}
-
 		}
 
 		serversList := list.New(serverItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
@@ -356,7 +371,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loadedLabels = msg.Labels
 		m.labelsPertainingToResource = msg.RelatedResourceName
 		m.State = stateLabelView
-
 
 	case message.StatusMsg:
 		m.statusMessage = string(msg)
