@@ -6,13 +6,13 @@ import (
 
 
 // Context menu items
-type contextMenuItem struct {
-	label  string
-	action string
+type ContextMenuItem struct {
+	Label  string
+	Action string
 }
 
-type contextMenu struct {
-	items        []contextMenuItem
-	selectedItem int
-	server       *hcloud.Server
+type ContextMenu struct {
+	Items        []ContextMenuItem
+	SelectedItem int
+	Server       *hcloud.Server
 }

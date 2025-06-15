@@ -12,14 +12,14 @@ import (
 	"time"
 
 	"lazyhetzner/internal/message"
-	"lazyhetzner/internal/context_menu"
+	ctm "lazyhetzner/internal/context_menu"
+	ctm_serv "lazyhetzner/internal/context_menu/server"
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/hetznercloud/hcloud-go/hcloud"
 )
 
@@ -125,59 +125,6 @@ func (c *Config) RemoveProject(name string) {
 	}
 }
 
-// Styles
-var (
-	titleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFDF5")).
-			Background(lipgloss.Color("#25A065")).
-			Padding(0, 1)
-
-	helpStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#626262"))
-
-	errorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF0000"))
-
-	infoStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#04B575"))
-
-	menuStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#874BFD")).
-			Padding(1, 2).
-			Background(lipgloss.Color("#1a1a1a"))
-
-	selectedMenuStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("#874BFD")).
-				Foreground(lipgloss.Color("#FFFDF5")).
-				Padding(0, 1)
-
-	successStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#04B575")).
-			Bold(true)
-
-	warningStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFAA00"))
-
-	focusedStyle = lipgloss.NewStyle().
-			BorderForeground(lipgloss.Color("#874BFD"))
-
-	blurredStyle = lipgloss.NewStyle().
-			BorderForeground(lipgloss.Color("#626262"))
-)
-
-// App states
-type state int
-
-const (
-	stateProjectSelect state = iota
-	stateProjectManage
-	stateTokenInput
-	stateLoading
-	stateResourceView
-	stateContextMenu
-	stateError
-)
 
 // Input forms
 type inputForm struct {
@@ -208,103 +155,6 @@ func newProjectForm() inputForm {
 		cancelBtn: "Cancel",
 	}
 }
-
-// Key bindings
-type keyMap struct {
-	Up     key.Binding
-	Down   key.Binding
-	Left   key.Binding
-	Right  key.Binding
-	Tab    key.Binding
-	Enter  key.Binding
-	Delete key.Binding
-	Add    key.Binding
-	Quit   key.Binding
-	Help   key.Binding
-	Reload key.Binding
-
-	Num1 key.Binding
-	Num2 key.Binding
-	Num3 key.Binding
-	Num4 key.Binding
-	Num5 key.Binding
-	Num6 key.Binding
-	Num7 key.Binding
-	Num8 key.Binding
-	Num9 key.Binding
-	Num0 key.Binding
-}
-
-func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Help, k.Quit}
-}
-
-func (k keyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{k.Up, k.Down, k.Left, k.Right},
-		{k.Tab, k.Enter, k.Add, k.Delete},
-		{k.Help, k.Quit},
-	}
-}
-
-var keys = keyMap{
-	Up: key.NewBinding(
-		key.WithKeys("up", "k"),
-		key.WithHelp("↑/k", "move up"),
-	),
-	Down: key.NewBinding(
-		key.WithKeys("down", "j"),
-		key.WithHelp("↓/j", "move down"),
-	),
-	Left: key.NewBinding(
-		key.WithKeys("left", "h"),
-		key.WithHelp("←/h", "move left"),
-	),
-	Right: key.NewBinding(
-		key.WithKeys("right", "l"),
-		key.WithHelp("→/l", "move right"),
-	),
-	Tab: key.NewBinding(
-		key.WithKeys("tab"),
-		key.WithHelp("tab", "switch view"),
-	),
-	Enter: key.NewBinding(
-		key.WithKeys("enter"),
-		key.WithHelp("enter", "select"),
-	),
-	Delete: key.NewBinding(
-		key.WithKeys("d", "delete"),
-		key.WithHelp("d", "delete"),
-	),
-	Add: key.NewBinding(
-		key.WithKeys("a"),
-		key.WithHelp("a", "add project"),
-	),
-	Help: key.NewBinding(
-		key.WithKeys("?"),
-		key.WithHelp("?", "toggle help"),
-	),
-	Quit: key.NewBinding(
-		key.WithKeys("q", "esc", "ctrl+c"),
-		key.WithHelp("q", "quit"),
-	),
-	Reload: key.NewBinding(
-		key.WithKeys("r"),
-		key.WithHelp("r", "reload resources"),
-	),
-
-	Num1: key.NewBinding(key.WithKeys("1")),
-	Num2: key.NewBinding(key.WithKeys("2")),
-	Num3: key.NewBinding(key.WithKeys("3")),
-	Num4: key.NewBinding(key.WithKeys("4")),
-	Num5: key.NewBinding(key.WithKeys("5")),
-	Num6: key.NewBinding(key.WithKeys("6")),
-	Num7: key.NewBinding(key.WithKeys("7")),
-	Num8: key.NewBinding(key.WithKeys("8")),
-	Num9: key.NewBinding(key.WithKeys("9")),
-	Num0: key.NewBinding(key.WithKeys("0")),
-}
-
 func getNumberForIndex(index int) string {
 	if index == 9 { // 10th item (0-indexed 9)
 		return "0"
@@ -443,13 +293,13 @@ type model struct {
 	currentProject  string
 	activeTab       resourceType
 	lists           map[resourceType]list.Model
-	contextMenu     contextMenu
+	contextMenu     ctm.ContextMenu
 	help            help.Model
 	err             error
 	width           int
 	height          int
 	statusMessage   string
-	sessionInfo     SessionInfo
+	sessionInfo     ctm_serv.SessionInfo
 	loadedResources map[resourceType]bool
 	loadingResource resourceType
 	isLoading       bool
@@ -466,9 +316,6 @@ type resourcesLoadedMsg struct {
 	loadBalancers []*hcloud.LoadBalancer
 	volumes       []*hcloud.Volume
 }
-
-
-
 
 type projectSavedMsg struct{}
 
@@ -920,10 +767,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if currentList, exists := m.lists[resourceServers]; exists {
 						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
 							if serverItem, ok := selectedItem.(serverItem); ok {
-								m.contextMenu = contextMenu{
-									items:        getSSHMenuItems(m.sessionInfo),
-									selectedItem: 0,
-									server:       serverItem.server,
+								m.contextMenu = ctm.ContextMenu{
+									Items:        getSSHMenuItems(m.sessionInfo),
+									SelectedItem: 0,
+									Server:       serverItem.server,
 								}
 								m.state = stateContextMenu
 							}

@@ -1,4 +1,4 @@
-package context_menu
+package server
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	"runtime"
 	tea "github.com/charmbracelet/bubbletea"
  	"lazyhetzner/internal/message"
+	ctm "lazyhetzner/internal/context_menu"
 	"github.com/hetznercloud/hcloud-go/hcloud"
 )
 
@@ -21,12 +22,12 @@ const (
 )
 
 
-// SSH action messages
-type sshLaunchedMsg struct{}
+// SSH Action messages
+type SshLaunchedMsg struct{}
 
-type tmuxSSHLaunchedMsg struct{}
+type TmuxSSHLaunchedMsg struct{}
 
-type zellijSSHLaunchedMsg struct{}
+type ZellijSSHLaunchedMsg struct{}
 
 // SessionInfo holds information about the current session
 type SessionInfo struct {
@@ -68,34 +69,34 @@ func detectSession() SessionInfo {
 	return info
 }
 
-// getSSHMenuItems returns context menu items based on the current session
-func getSSHMenuItems(sessionInfo SessionInfo) []contextMenuItem {
-	baseItems := []contextMenuItem{
-		{label: "📋 Copy Public IP", action: "copy_public_ip"},
-		{label: "📋 Copy Private IP", action: "copy_private_ip"},
+// getSSHMenuItems returns context menu Items based on the current session
+func getSSHMenuItems(sessionInfo SessionInfo) []ctm.ContextMenuItem {
+	baseItems := []ctm.ContextMenuItem{
+		{Label: "📋 Copy Public IP", Action: "copy_public_ip"},
+		{Label: "📋 Copy Private IP", Action: "copy_private_ip"},
 	}
 
 	switch sessionInfo.Type {
 	case SessionTmux:
-		return append(baseItems, []contextMenuItem{
-			{label: "🪟 SSH (New tmux window)", action: "ssh_tmux_window"},
-			{label: "📱 SSH (New tmux pane)", action: "ssh_tmux_pane"},
-			{label: "🔗 SSH (New terminal)", action: "ssh_new_terminal"},
-			{label: "🔗 SSH (Current terminal)", action: "ssh_current_terminal"},
+		return append(baseItems, []ctm.ContextMenuItem{
+			{Label: "🪟 SSH (New tmux window)", Action: "ssh_tmux_window"},
+			{Label: "📱 SSH (New tmux pane)", Action: "ssh_tmux_pane"},
+			{Label: "🔗 SSH (New terminal)", Action: "ssh_new_terminal"},
+			{Label: "🔗 SSH (Current terminal)", Action: "ssh_current_terminal"},
 		}...)
 
 	case SessionZellij:
-		return append(baseItems, []contextMenuItem{
-			{label: "🪟 SSH (New zellij tab)", action: "ssh_zellij_tab"},
-			{label: "📱 SSH (New zellij pane)", action: "ssh_zellij_pane"},
-			{label: "🔗 SSH (New terminal)", action: "ssh_new_terminal"},
-			{label: "🔗 SSH (Current terminal)", action: "ssh_current_terminal"},
+		return append(baseItems, []ctm.ContextMenuItem{
+			{Label: "🪟 SSH (New zellij tab)", Action: "ssh_zellij_tab"},
+			{Label: "📱 SSH (New zellij pane)", Action: "ssh_zellij_pane"},
+			{Label: "🔗 SSH (New terminal)", Action: "ssh_new_terminal"},
+			{Label: "🔗 SSH (Current terminal)", Action: "ssh_current_terminal"},
 		}...)
 
 	default:
-		return append(baseItems, []contextMenuItem{
-			{label: "🔗 SSH (New terminal)", action: "ssh_new_terminal"},
-			{label: "🔗 SSH (Current terminal)", action: "ssh_current_terminal"},
+		return append(baseItems, []ctm.ContextMenuItem{
+			{Label: "🔗 SSH (New terminal)", Action: "ssh_new_terminal"},
+			{Label: "🔗 SSH (Current terminal)", Action: "ssh_current_terminal"},
 		}...)
 	}
 }
@@ -145,7 +146,7 @@ func launchSSH(ip string) tea.Cmd {
 			return message.ErrorMsg{err}
 		}
 
-		return sshLaunchedMsg{}
+		return SshLaunchedMsg{}
 	}
 }
 
@@ -184,7 +185,7 @@ func launchSSHInZellijTab(ip string) tea.Cmd {
 		tabName := fmt.Sprintf("ssh-%s", strings.ReplaceAll(ip, ".", "-"))
 
 		// Create new tab with SSH command
-		cmd := exec.Command("zellij", "action", "new-tab", "--name", tabName, "--", "ssh", fmt.Sprintf("root@%s", ip))
+		cmd := exec.Command("zellij", "Action", "new-tab", "--name", tabName, "--", "ssh", fmt.Sprintf("root@%s", ip))
 
 		if err := cmd.Run(); err != nil {
 			return message.ErrorMsg{fmt.Errorf("failed to create zellij tab: %w", err)}
@@ -198,7 +199,7 @@ func launchSSHInZellijTab(ip string) tea.Cmd {
 func launchSSHInZellijPane(ip string) tea.Cmd {
 	return func() tea.Msg {
 		// Split the current pane and run SSH
-		cmd := exec.Command("zellij", "action", "new-pane", "--", "ssh", fmt.Sprintf("root@%s", ip))
+		cmd := exec.Command("zellij", "Action", "new-pane", "--", "ssh", fmt.Sprintf("root@%s", ip))
 
 		if err := cmd.Run(); err != nil {
 			return message.ErrorMsg{fmt.Errorf("failed to create zellij pane: %w", err)}
@@ -214,7 +215,7 @@ func launchSSHInSameTerminal(ip string) tea.Cmd {
 		if err != nil {
 			return message.ErrorMsg{err}
 		}
-		return sshLaunchedMsg{}
+		return SshLaunchedMsg{}
 	})
 }
 
@@ -223,15 +224,15 @@ func (m *model) initSessionInfo() {
 	m.sessionInfo = detectSession()
 }
 
-func createServerContextMenu(server *hcloud.Server, sessionInfo SessionInfo) contextMenu {
-	return contextMenu{
-		items:        getSSHMenuItems(sessionInfo),
-		selectedItem: 0,
-		server:       server,
+func createServerContextMenu(server *hcloud.Server, sessionInfo SessionInfo) ctm.ContextMenu {
+	return ctm.ContextMenu{
+		Items:        getSSHMenuItems(sessionInfo),
+		SelectedItem: 0,
+		Server:       server,
 	}
 }
 
-func handleSSHAction(action string, server *hcloud.Server, sessionInfo SessionInfo) tea.Cmd {
+func handleSSHAction(Action string, server *hcloud.Server, sessionInfo SessionInfo) tea.Cmd {
 	if server.PublicNet.IPv4.IP == nil {
 		return func() tea.Msg {
 			return message.ErrorMsg{fmt.Errorf("server has no public IP")}
@@ -240,7 +241,7 @@ func handleSSHAction(action string, server *hcloud.Server, sessionInfo SessionIn
 
 	ip := server.PublicNet.IPv4.IP.String()
 
-	switch action {
+	switch Action {
 	case "ssh_tmux_window":
 		return launchSSHInTmuxWindow(ip)
 	case "ssh_tmux_pane":
