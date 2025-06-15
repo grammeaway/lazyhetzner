@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	tea "github.com/charmbracelet/bubbletea"
+	"lazyhetzner/internal/resource"
+
 )
 
 
@@ -18,6 +20,9 @@ type ServersLoadedMsg struct {
 
 type ServerItem struct {
 	Server *hcloud.Server
+	ResourceType resource.ResourceType
+	ResourceID   int
+
 }
 
 func (i ServerItem) FilterValue() string { return i.Server.Name }

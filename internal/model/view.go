@@ -184,7 +184,9 @@ func (m Model) View() string {
 		// Add help text about number shortcuts
 		helpText := "\nPress number keys for quick selection • ↑/↓ to navigate • Enter to select • Esc to cancel"
 		menu := menuStyle.Render(fmt.Sprintf("Actions for %s:\n\n%s%s",
-			m.contextMenu.Server.Name,
+
+			resource.GetResourceNameFromType(m.contextMenu.ResourceType),
+
 			menuContent,
 			helpStyle.Render(helpText)))
 

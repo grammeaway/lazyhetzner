@@ -11,6 +11,7 @@ import (
 	ctm "lazyhetzner/internal/context_menu"
 	"github.com/hetznercloud/hcloud-go/hcloud"
 	"github.com/atotto/clipboard"
+	"lazyhetzner/internal/resource"
 )
 
 // SessionType represents the type of terminal multiplexer session
@@ -228,7 +229,8 @@ func CreateServerContextMenu(server *hcloud.Server) ctm.ContextMenu {
 	return ctm.ContextMenu{
 		Items:        getSSHMenuItems(sessionInfo),
 		SelectedItem: 0,
-		Server:       server,
+		ResourceType: resource.ResourceServers,
+		ResourceID:   server.ID,
 	}
 }
 

@@ -232,11 +232,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case key.Matches(msg, keys.Enter):
 				selectedAction := m.contextMenu.Items[m.contextMenu.SelectedItem].Action
-				// Get resource type and ID
-				resourceType := m.contextMenu.Items[m.contextMenu.SelectedItem].ResourceType
-				resourceID := m.contextMenu.Items[m.contextMenu.SelectedItem].ResourceID
 				m.State = stateResourceView
-				return m, m.executeContextAction(selectedAction, resourceType, resourceID) 
+				return m, m.executeContextAction(selectedAction, m.contextMenu.ResourceType, m.contextMenu.ResourceID) 
+
 
 			case key.Matches(msg, keys.Num1, keys.Num2, keys.Num3, keys.Num4, keys.Num5,
 				keys.Num6, keys.Num7, keys.Num8, keys.Num9, keys.Num0):
@@ -247,11 +245,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Check if the number corresponds to a valid menu item
 				if selectedIndex >= 0 && selectedIndex < len(m.contextMenu.Items) {
 					selectedAction := m.contextMenu.Items[selectedIndex].Action
-					// Get resource type and ID	
-					resourceType := m.contextMenu.Items[selectedIndex].ResourceType
-					resourceID := m.contextMenu.Items[selectedIndex].ResourceID
+
 					m.State = stateResourceView
-					return m, m.executeContextAction(selectedAction, resourceType, resourceID)
+					return m, m.executeContextAction(selectedAction, m.contextMenu.ResourceType, m.contextMenu.ResourceID)
+
 				}
 
 			case key.Matches(msg, keys.Quit):
@@ -279,7 +276,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Create server list
 		serverItems := make([]list.Item, len(msg.Servers))
 		for i, server := range msg.Servers {
-			serverItems[i] = r_serv.ServerItem{Server: server}
+			serverItems[i] = r_serv.ServerItem{
+				Server: server,
+				ResourceType: resource.ResourceServers,
+				ResourceID:   server.ID,
+
+			}
+
 		}
 
 		serversList := list.New(serverItems, list.NewDefaultDelegate(), m.width-4, m.height-10)

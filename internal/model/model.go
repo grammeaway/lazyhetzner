@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"strconv"
@@ -91,10 +92,14 @@ func (m *Model) executeContextAction(selectedAction string, resourceType resourc
 	switch resourceType {
 	case resource.ResourceServers:
 		server, _, err := m.client.Server.Get(context.Background(), strconv.Itoa(resourceID))
-		
 		if err != nil {
 			return func() tea.Msg {
 				return message.ErrorMsg{err}
+			}
+		}
+		if server == nil {
+			return func() tea.Msg {
+				return message.ErrorMsg{fmt.Errorf("server with ID %d not found", resourceID)}
 			}
 		}
 
