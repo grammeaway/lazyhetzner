@@ -3,9 +3,9 @@ package model
 import (
 	"fmt"
 	"github.com/charmbracelet/lipgloss"
-	"strings"
-	util "lazyhetzner/utility"
 	"lazyhetzner/internal/resource"
+	util "lazyhetzner/utility"
+	"strings"
 )
 
 func (m Model) View() string {
@@ -69,7 +69,6 @@ func (m Model) View() string {
 			titleStyle.Render("lazyhetzner - Add Project"),
 			formView.String(),
 		)
-
 	case stateTokenInput:
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n\n%s\n\n%s\n",
@@ -141,6 +140,21 @@ func (m Model) View() string {
 			helpStyle.Render(helpText),
 		)
 
+	case stateLabelView:
+		// Render the label View
+		var labelView strings.Builder
+		labelView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("lazyhetzner - Labels")))
+		labelView.WriteString(infoStyle.Render("Labels for " + m.labelsPertainingToResource + ":\n\n"))
+		if len(m.loadedLabels) == 0 {
+			labelView.WriteString(helpStyle.Render("No labels found."))
+		} else {
+			for key, value := range m.loadedLabels {
+				labelView.WriteString(fmt.Sprintf("%s: %s\n", labelStyle.Render(key), value))
+			}
+		}
+		labelView.WriteString("\n" + helpStyle.Render("Press q to go back to resource view"))
+
+		return labelView.String()
 	case stateContextMenu:
 		// Render the current resource view in background
 		projectHeader := fmt.Sprintf("Project: %s", m.currentProject)

@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/hetznercloud/hcloud-go/hcloud"
-	"github.com/atotto/clipboard"
 	"lazyhetzner/internal/input_form"
 	"lazyhetzner/internal/message"
 	"lazyhetzner/internal/resource"
@@ -44,6 +43,8 @@ type Model struct {
 	LoadedResources map[resource.ResourceType]bool
 	loadingResource resource.ResourceType
 	IsLoading       bool
+	loadedLabels map[string]string
+	labelsPertainingToResource string
 }
 
 // Resource types for tabs
@@ -66,18 +67,6 @@ func (m *Model) getResourceLoadCmd(rt resource.ResourceType) tea.Cmd {
 		return r_vol.LoadVolumes(m.client)
 	default:
 		return nil
-	}
-}
-
-
-
-func copyToClipboard(text string) tea.Cmd {
-	return func() tea.Msg {
-		err := clipboard.WriteAll(text)
-		if err != nil {
-			return message.ErrorMsg{err}
-		}
-		return message.ClipboardCopiedMsg(text)
 	}
 }
 

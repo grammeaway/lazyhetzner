@@ -18,6 +18,7 @@ import (
 	r_vol "lazyhetzner/internal/resource/volume"
 	r_lb "lazyhetzner/internal/resource/loadbalancer"
 	r_n "lazyhetzner/internal/resource/network"
+	r_label "lazyhetzner/internal/resource/label"
 )
 
 
@@ -217,7 +218,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, keys.Quit):
 				m.State = StateProjectSelect
 			}
-
+		case stateLabelView:
+			switch {
+			case key.Matches(msg, keys.Quit):
+				m.State = stateResourceView
+			}
 		case stateContextMenu:
 			switch {
 			case key.Matches(msg, keys.Up):
@@ -345,6 +350,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ctm_serv.ZellijSSHLaunchedMsg:
 		m.statusMessage = "📱 SSH session launched in zellij"
 		return m, clearStatusMessage()
+
+	case r_label.LabelsLoadedMsg:
+		m.IsLoading = false
+		m.loadedLabels = msg.Labels
+		m.labelsPertainingToResource = msg.RelatedResourceName
+		m.State = stateLabelView
+
 
 	case message.StatusMsg:
 		m.statusMessage = string(msg)

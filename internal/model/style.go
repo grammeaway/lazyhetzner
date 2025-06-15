@@ -3,7 +3,7 @@ package model
 import (
 	"github.com/charmbracelet/lipgloss"
 )
-// Styles
+
 var (
 	titleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FFFDF5")).
@@ -42,5 +42,11 @@ var (
 
 	blurredStyle = lipgloss.NewStyle().
 			BorderForeground(lipgloss.Color("#626262"))
+
+	labelStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#626262")).
+			Background(lipgloss.Color("#1a1a1a")).
+			Padding(0, 1, 0, 2).
+			Bold(true)
 )
 
