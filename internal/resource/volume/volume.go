@@ -8,31 +8,31 @@ import (
 	"lazyhetzner/internal/message"
 )
 
-type volumesLoadedMsg struct {
-	volumes []*hcloud.Volume
+type VolumesLoadedMsg struct {
+	Volumes []*hcloud.Volume
 }
 
-type volumeItem struct {
-	volume *hcloud.Volume
+type VolumeItem struct {
+	Volume *hcloud.Volume
 }
 
-func (i volumeItem) FilterValue() string { return i.volume.Name }
-func (i volumeItem) Title() string       { return i.volume.Name }
-func (i volumeItem) Description() string {
+func (i VolumeItem) FilterValue() string { return i.Volume.Name }
+func (i VolumeItem) Title() string       { return i.Volume.Name }
+func (i VolumeItem) Description() string {
 	status := "📦 Available"
-	if i.volume.Server != nil {
-		status = "🔗 Attached to " + i.volume.Server.Name
+	if i.Volume.Server != nil {
+		status = "🔗 Attached to " + i.Volume.Server.Name
 	}
-	return fmt.Sprintf("%s | %dGB | %s", status, i.volume.Size, i.volume.Location.Name)
+	return fmt.Sprintf("%s | %dGB | %s", status, i.Volume.Size, i.Volume.Location.Name)
 }
 
-func loadVolumes(client *hcloud.Client) tea.Cmd {
+func LoadVolumes(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		volumes, err := client.Volume.All(ctx)
 		if err != nil {
 			return message.ErrorMsg{err}
 		}
-		return volumesLoadedMsg{volumes: volumes}
+		return VolumesLoadedMsg{Volumes: volumes}
 	}
 }

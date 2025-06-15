@@ -8,30 +8,30 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type networksLoadedMsg struct {
-	networks []*hcloud.Network
+type NetworksLoadedMsg struct {
+	Networks []*hcloud.Network
 }
 
 
 
-type networkItem struct {
-	network *hcloud.Network
+type NetworkItem struct {
+	Network *hcloud.Network
 }
 
-func (i networkItem) FilterValue() string { return i.network.Name }
-func (i networkItem) Title() string       { return i.network.Name }
-func (i networkItem) Description() string {
-	return fmt.Sprintf("IP Range: %s | Subnets: %d", i.network.IPRange.String(), len(i.network.Subnets))
+func (i NetworkItem) FilterValue() string { return i.Network.Name }
+func (i NetworkItem) Title() string       { return i.Network.Name }
+func (i NetworkItem) Description() string {
+	return fmt.Sprintf("IP Range: %s | Subnets: %d", i.Network.IPRange.String(), len(i.Network.Subnets))
 }
 
 
-func loadNetworks(client *hcloud.Client) tea.Cmd {
+func LoadNetworks(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		networks, err := client.Network.All(ctx)
 		if err != nil {
 			return message.ErrorMsg{err}
 		}
-		return networksLoadedMsg{networks: networks}
+		return NetworksLoadedMsg{Networks: networks}
 	}
 }

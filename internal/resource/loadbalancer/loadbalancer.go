@@ -9,36 +9,36 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	)
 
-type loadBalancersLoadedMsg struct {
-	loadBalancers []*hcloud.LoadBalancer
+type LoadBalancersLoadedMsg struct {
+	LoadBalancers []*hcloud.LoadBalancer
 }
 
 
 
 
-type loadBalancerItem struct {
-	lb *hcloud.LoadBalancer
+type LoadBalancerItem struct {
+	Lb *hcloud.LoadBalancer
 }
 
-func (i loadBalancerItem) FilterValue() string { return i.lb.Name }
-func (i loadBalancerItem) Title() string       { return i.lb.Name }
-func (i loadBalancerItem) Description() string {
+func (i LoadBalancerItem) FilterValue() string { return i.Lb.Name }
+func (i LoadBalancerItem) Title() string       { return i.Lb.Name }
+func (i LoadBalancerItem) Description() string {
 	status := "🟢 Available"
-	if i.lb.PublicNet.Enabled {
-		return fmt.Sprintf("%s | %s | Targets: %d", status, i.lb.PublicNet.IPv4.IP.String(), len(i.lb.Targets))
+	if i.Lb.PublicNet.Enabled {
+		return fmt.Sprintf("%s | %s | Targets: %d", status, i.Lb.PublicNet.IPv4.IP.String(), len(i.Lb.Targets))
 	}
-	return fmt.Sprintf("%s | Private only | Targets: %d", status, len(i.lb.Targets))
+	return fmt.Sprintf("%s | Private only | Targets: %d", status, len(i.Lb.Targets))
 }
 
 
 
-func loadLoadBalancers(client *hcloud.Client) tea.Cmd {
+func LoadLoadBalancers(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		loadBalancers, err := client.LoadBalancer.All(ctx)
 		if err != nil {
 			return message.ErrorMsg{err}
 		}
-		return loadBalancersLoadedMsg{loadBalancers: loadBalancers}
+		return LoadBalancersLoadedMsg{LoadBalancers: loadBalancers}
 	}
 }

@@ -14,7 +14,13 @@ import (
 	"lazyhetzner/internal/input_form"
 	"lazyhetzner/internal/message"
 	"lazyhetzner/internal/resource"
+	r_serv "lazyhetzner/internal/resource/server"
+	r_vol "lazyhetzner/internal/resource/volume"
+	r_lb "lazyhetzner/internal/resource/loadbalancer"
+	r_n"lazyhetzner/internal/resource/network"
+	r_prj "lazyhetzner/internal/resource/project"
 	"context"
+	"time"
 )
 
 // Main model
@@ -50,13 +56,13 @@ func (m *Model) getResourceLoadCmd(rt resource.ResourceType) tea.Cmd {
 
 	switch rt {
 	case resource.ResourceServers:
-		return loadServers(m.client)
+		return r_serv.LoadServers(m.client)
 	case resource.ResourceNetworks:
-		return loadNetworks(m.client)
+		return r_n.LoadNetworks(m.client)
 	case resource.ResourceLoadBalancers:
-		return loadLoadBalancers(m.client)
+		return r_lb.LoadLoadBalancers(m.client)
 	case resource.ResourceVolumes:
-		return loadVolumes(m.client)
+		return r_vol.LoadVolumes(m.client)
 	default:
 		return nil
 	}
@@ -65,9 +71,16 @@ func (m *Model) getResourceLoadCmd(rt resource.ResourceType) tea.Cmd {
 
 
 
-func (m *Model) executeContextAction(selectedAction string, resourceType ResourceType, resourceID int) tea.Cmd {	
+func clearStatusMessage() tea.Cmd {
+	return tea.Tick(time.Second*3, func(t time.Time) tea.Msg {
+		return message.StatusMsg("")
+	})
+}
+
+
+func (m *Model) executeContextAction(selectedAction string, resourceType resource.ResourceType, resourceID int) tea.Cmd {	
 	switch resourceType {
-	case ResourceServers:
+	case resource.ResourceServers:
 		server, _, err := m.client.Server.Get(context.Background(), strconv.Itoa(resourceID))
 		
 		if err != nil {
@@ -84,15 +97,15 @@ func (m *Model) executeContextAction(selectedAction string, resourceType Resourc
 
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(textinput.Blink, loadConfigCmd())
+	return tea.Batch(textinput.Blink, config.LoadConfigCmd())
 }
 
 func (m *Model) updateProjectList() {
 	items := make([]list.Item, len(m.config.Projects))
 	for i, project := range m.config.Projects {
-		items[i] = projectItem{
-			config:    project,
-			isDefault: project.Name == m.config.DefaultProject,
+		items[i] = r_prj.ProjectItem{
+			Config:    project,
+			IsDefault: project.Name == m.config.DefaultProject,
 		}
 	}
 

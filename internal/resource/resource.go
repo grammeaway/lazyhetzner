@@ -12,9 +12,6 @@ import (
 	"lazyhetzner/internal/message"
 )
 
-
-
-
 type ResourceType int
 
 const (
@@ -23,11 +20,6 @@ const (
 	ResourceLoadBalancers
 	ResourceVolumes
 )
-
-
-
-
-
 
 func loadResources(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
@@ -73,16 +65,16 @@ type resourcesLoadedMsg struct {
 
 
 
-type resourceLoadStartMsg struct {
-	resourceType ResourceType
+type ResourceLoadStartMsg struct {
+	ResourceType ResourceType
 }
 
 
 
 
-func startResourceLoad(rt ResourceType) tea.Cmd {
+func StartResourceLoad(rt ResourceType) tea.Cmd {
 	return func() tea.Msg {
-		return resourceLoadStartMsg{resourceType: rt}
+		return ResourceLoadStartMsg{ResourceType: rt}
 	}
 }
 

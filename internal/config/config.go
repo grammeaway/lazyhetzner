@@ -20,12 +20,12 @@ type Config struct {
 }
 
 
-type configLoadedMsg struct {
-	config *Config
+type ConfigLoadedMsg struct {
+Config *Config
 }
 
 
-type projectSavedMsg struct{}
+type ProjectSavedMsg struct{}
 
 func getConfigPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
@@ -120,21 +120,21 @@ func (c *Config) RemoveProject(name string) {
 
 
 
-func loadConfigCmd() tea.Cmd {
+func LoadConfigCmd() tea.Cmd {
 	return func() tea.Msg {
 		config, err := loadConfig()
 		if err != nil {
 			return message.ErrorMsg{err}
 		}
-		return configLoadedMsg{config}
+		return ConfigLoadedMsg{config}
 	}
 }
 
-func saveConfigCmd(config *Config) tea.Cmd {
+func SaveConfigCmd(config *Config) tea.Cmd {
 	return func() tea.Msg {
 		if err := saveConfig(config); err != nil {
 			return message.ErrorMsg{err}
 		}
-		return projectSavedMsg{}
+		return ProjectSavedMsg{}
 	}
 }

@@ -5,11 +5,12 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"strings"
 	util "lazyhetzner/utility"
+	"lazyhetzner/internal/resource"
 )
 
 func (m Model) View() string {
-	switch m.state {
-	case stateProjectSelect:
+	switch m.State {
+	case StateProjectSelect:
 		if m.config == nil {
 			return fmt.Sprintf(
 				"\n%s\n\n%s\n",
@@ -74,7 +75,7 @@ func (m Model) View() string {
 			"\n%s\n\n%s\n\n%s\n\n%s\n",
 			titleStyle.Render("lazyhetzner"),
 			infoStyle.Render("Enter API token for one-time access:"),
-			m.tokenInput.View(),
+			m.TokenInput.View(),
 			helpStyle.Render("Press Enter to continue • Press q to go back"),
 		)
 
@@ -95,9 +96,9 @@ func (m Model) View() string {
 		// Render tabs
 		var tabs []string
 		for i, tab := range resourceTabs {
-			if ResourceType(i) == m.activeTab {
+			if resource.ResourceType(i) == m.activeTab {
 				// Show loading indicator in active tab if loading
-				if m.isLoading && m.loadingResource == ResourceType(i) {
+				if m.IsLoading && m.loadingResource == resource.ResourceType(i) {
 					tabs = append(tabs, titleStyle.Render(tab+" (loading...)"))
 				} else {
 					tabs = append(tabs, titleStyle.Render(tab))
@@ -110,11 +111,11 @@ func (m Model) View() string {
 
 		// Render current list or loading message
 		var listView string
-		if m.isLoading && m.loadingResource == m.activeTab {
+		if m.IsLoading && m.loadingResource == m.activeTab {
 			listView = infoStyle.Render("Loading " + strings.ToLower(resourceTabs[m.activeTab]) + "...")
-		} else if currentList, exists := m.lists[m.activeTab]; exists {
+		} else if currentList, exists := m.Lists[m.activeTab]; exists {
 			listView = currentList.View()
-		} else if !m.loadedResources[m.activeTab] {
+		} else if !m.LoadedResources[m.activeTab] {
 			listView = helpStyle.Render("Resources not loaded yet. Loading will start automatically.")
 		} else {
 			listView = helpStyle.Render("No " + strings.ToLower(resourceTabs[m.activeTab]) + " found.")
@@ -127,7 +128,7 @@ func (m Model) View() string {
 		}
 
 		helpText := "Tab: switch view • ←/→: navigate tabs • Enter: actions • r: reload resources • q: back to projects"
-		if m.activeTab == ResourceServers {
+		if m.activeTab == resource.ResourceServers {
 			helpText = "Tab: switch view • ←/→: navigate tabs • Enter: server actions • r: reload resources • q: back to projects"
 		}
 
@@ -149,7 +150,7 @@ func (m Model) View() string {
 
 		var tabs []string
 		for i, tab := range resourceTabs {
-			if ResourceType(i) == m.activeTab {
+			if resource.ResourceType(i) == m.activeTab {
 				tabs = append(tabs, titleStyle.Render(tab))
 			} else {
 				tabs = append(tabs, helpStyle.Render(tab))
@@ -158,7 +159,7 @@ func (m Model) View() string {
 		tabsView := strings.Join(tabs, " ")
 
 		var listView string
-		if currentList, exists := m.lists[m.activeTab]; exists {
+		if currentList, exists := m.Lists[m.activeTab]; exists {
 			listView = currentList.View()
 		}
 

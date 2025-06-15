@@ -26,13 +26,6 @@ func copyToClipboard(text string) tea.Cmd {
 }
 
 
-func clearStatusMessage() tea.Cmd {
-	return tea.Tick(time.Second*3, func(t time.Time) tea.Msg {
-		return message.StatusMsg("")
-	})
-}
-
-
 func initialModel() model.Model {
 	ti := textinput.New()
 	ti.Placeholder = "Enter your Hetzner Cloud API token..."
