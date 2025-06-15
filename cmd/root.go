@@ -538,7 +538,24 @@ func clearStatusMessage() tea.Cmd {
 	})
 }
 
-func (m *model) executeContextAction(selectedAction string, server *hcloud.Server) tea.Cmd {
+
+func (m *model) executeContextAction(selectedAction string, resourceType resourceType, resourceID int) tea.Cmd {	
+	switch resourceType {
+	case resourceServers:
+		server, _, err := m.client.Server.Get(context.Background(), strconv.Itoa(resourceID))
+		
+		if err != nil {
+			return func() tea.Msg {
+				return message.ErrorMsg{err}
+			}
+		}
+
+		return ctm_serv.ExecuteServerContextAction(selectedAction, m.client, server)
+	}
+	return nil
+}
+
+func (m *model) executeContextActionOld(selectedAction string, server *hcloud.Server) tea.Cmd {
 	switch selectedAction {
 	case "copy_public_ip":
 		if server.PublicNet.IPv4.IP != nil {
@@ -554,23 +571,23 @@ func (m *model) executeContextAction(selectedAction string, server *hcloud.Serve
 		}
 	case "ssh_tmux_window":
 		if server.PublicNet.IPv4.IP != nil {
-			return launchSSHInTmuxWindow(server.PublicNet.IPv4.IP.String())
+			return ctm_serv.LaunchSSHInTmuxWindow(server.PublicNet.IPv4.IP.String())
 		}
 	case "ssh_tmux_pane":
 		if server.PublicNet.IPv4.IP != nil {
-			return launchSSHInTmuxPane(server.PublicNet.IPv4.IP.String())
+			return ctm_serv.launchSSHInTmuxPane(server.PublicNet.IPv4.IP.String())
 		}
 	case "ssh_zellij_tab":
 		if server.PublicNet.IPv4.IP != nil {
-			return launchSSHInZellijTab(server.PublicNet.IPv4.IP.String())
+			return ctm_serv.LaunchSSHInZellijTab(server.PublicNet.IPv4.IP.String())
 		}
 	case "ssh_zellij_pane":
 		if server.PublicNet.IPv4.IP != nil {
-			return launchSSHInZellijPane(server.PublicNet.IPv4.IP.String())
+			return ctm_serv.LaunchSSHInZellijPane(server.PublicNet.IPv4.IP.String())
 		}
 	case "ssh_new_terminal":
 		if server.PublicNet.IPv4.IP != nil {
-			return launchSSH(server.PublicNet.IPv4.IP.String())
+			return ctm_serv.LaunchSSH(server.PublicNet.IPv4.IP.String())
 		}
 	case "ssh_current_terminal":
 		if server.PublicNet.IPv4.IP != nil {
@@ -828,18 +845,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case stateContextMenu:
 			switch {
 			case key.Matches(msg, keys.Up):
-				if m.contextMenu.selectedItem > 0 {
-					m.contextMenu.selectedItem--
+				if m.contextMenu.SelectedItem > 0 {
+					m.contextMenu.SelectedItem--
 				}
 
 			case key.Matches(msg, keys.Down):
-				if m.contextMenu.selectedItem < len(m.contextMenu.items)-1 {
-					m.contextMenu.selectedItem++
+				if m.contextMenu.SelectedItem < len(m.contextMenu.Items)-1 {
+					m.contextMenu.SelectedItem++
 				}
 
 			case key.Matches(msg, keys.Enter):
-				selectedAction := m.contextMenu.items[m.contextMenu.selectedItem].action
-				server := m.contextMenu.server
+				selectedAction := m.contextMenu.Items[m.contextMenu.SelectedItem].Action
+				server := m.contextMenu.Server
 				m.state = stateResourceView
 				return m, m.executeContextAction(selectedAction, server)
 
@@ -850,9 +867,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				selectedIndex := getIndexFromNumber(keyStr)
 
 				// Check if the number corresponds to a valid menu item
-				if selectedIndex >= 0 && selectedIndex < len(m.contextMenu.items) {
-					selectedAction := m.contextMenu.items[selectedIndex].action
-					server := m.contextMenu.server
+				if selectedIndex >= 0 && selectedIndex < len(m.contextMenu.Items) {
+					selectedAction := m.contextMenu.Items[selectedIndex].Action
+					server := m.contextMenu.Server
 					m.state = stateResourceView
 					return m, m.executeContextAction(selectedAction, server)
 				}

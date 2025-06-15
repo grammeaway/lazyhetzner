@@ -37,7 +37,7 @@ type SessionInfo struct {
 	PaneName    string
 }
 
-// detectSession detects if we're running inside tmux or zellij
+// Detects if running inside tmux or zellij
 func detectSession() SessionInfo {
 	info := SessionInfo{Type: SessionNone}
 
@@ -47,7 +47,7 @@ func detectSession() SessionInfo {
 		info.SessionName = os.Getenv("TMUX_SESSION")
 		info.WindowName = os.Getenv("TMUX_WINDOW")
 		info.PaneName = os.Getenv("TMUX_PANE")
-
+		
 		// If session name is empty, try to get it via tmux command
 		if info.SessionName == "" {
 			if cmd := exec.Command("tmux", "display-message", "-p", "#S"); cmd != nil {
@@ -101,7 +101,7 @@ func getSSHMenuItems(sessionInfo SessionInfo) []ctm.ContextMenuItem {
 	}
 }
 
-
+// launchSSH launches SSH in a new terminal window based on the OS
 func launchSSH(ip string) tea.Cmd {
 	return func() tea.Msg {
 		var cmd *exec.Cmd
@@ -209,6 +209,7 @@ func launchSSHInZellijPane(ip string) tea.Cmd {
 	}
 }
 
+// launchSSHInSameTerminal launches SSH in the same terminal
 func launchSSHInSameTerminal(ip string) tea.Cmd {
 
 	return tea.ExecProcess(exec.Command("ssh", fmt.Sprintf("root@%s", ip)), func(err error) tea.Msg {
@@ -220,9 +221,9 @@ func launchSSHInSameTerminal(ip string) tea.Cmd {
 }
 
 
-func (m *model) initSessionInfo() {
-	m.sessionInfo = detectSession()
-}
+//func (m *model) initSessionInfo() {
+//	m.sessionInfo = detectSession()
+//}
 
 func createServerContextMenu(server *hcloud.Server, sessionInfo SessionInfo) ctm.ContextMenu {
 	return ctm.ContextMenu{
@@ -254,6 +255,35 @@ func handleSSHAction(Action string, server *hcloud.Server, sessionInfo SessionIn
 		return launchSSH(ip)
 	case "ssh_current_terminal":
 		return launchSSHInSameTerminal(ip)
+	default:
+		return nil
+	}
+}
+
+
+func (m *model) ExecuteServerContextAction(selectedAction string, server *hcloud.Server) tea.Cmd {
+	sessionInfo := detectSession()
+
+	// Handle SSH actions based on the selected action
+	if strings.HasPrefix(selectedAction, "ssh_") {
+		return handleSSHAction(selectedAction, server, sessionInfo)
+	}
+
+	// Handle other actions here if needed
+	switch selectedAction {
+	case "copy_public_ip":
+		return func() tea.Msg {
+			return message.ClipboardCopiedMsg(server.PublicNet.IPv4.IP.String())
+		}
+	case "copy_private_ip":
+		if server.PrivateNet[0].IP != nil {
+			return func() tea.Msg {
+				return message.ClipboardCopiedMsg(server.PrivateNet[0].IP.String())
+			}
+		}
+		return func() tea.Msg {
+			return message.ErrorMsg{fmt.Errorf("server has no private IP")}
+		}
 	default:
 		return nil
 	}
