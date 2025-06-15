@@ -2,208 +2,31 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"lazyhetzner/internal/message"
-	ctm "lazyhetzner/internal/context_menu"
-	ctm_serv "lazyhetzner/internal/context_menu/server"
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/hetznercloud/hcloud-go/hcloud"
+	"lazyhetzner/internal/config"
+	"lazyhetzner/internal/model"
 )
 
-// Config management
-type ProjectConfig struct {
-	Name  string `json:"name"`
-	Token string `json:"token"`
-}
 
-type Config struct {
-	Projects       []ProjectConfig `json:"projects"`
-	DefaultProject string          `json:"default_project"`
-}
-
-func getConfigPath() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	configDir := filepath.Join(homeDir, ".config", "lazyhetzner")
-	if err := os.MkdirAll(configDir, 0700); err != nil {
-		return "", err
-	}
-
-	return filepath.Join(configDir, "config.json"), nil
-}
-
-func loadConfig() (*Config, error) {
-	configPath, err := getConfigPath()
-	if err != nil {
-		return &Config{Projects: []ProjectConfig{}}, nil
-	}
-
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return &Config{Projects: []ProjectConfig{}}, nil
-		}
-		return nil, err
-	}
-
-	var config Config
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, err
-	}
-
-	return &config, nil
-}
-
-func saveConfig(config *Config) error {
-	configPath, err := getConfigPath()
-	if err != nil {
-		return err
-	}
-
-	data, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(configPath, data, 0600)
-}
-
-func (c *Config) AddProject(name, token string) {
-	// Remove existing project with same name
-	for i, p := range c.Projects {
-		if p.Name == name {
-			c.Projects = append(c.Projects[:i], c.Projects[i+1:]...)
-			break
-		}
-	}
-
-	c.Projects = append(c.Projects, ProjectConfig{
-		Name:  name,
-		Token: token,
-	})
-
-	// Set as default if it's the first project
-	if len(c.Projects) == 1 {
-		c.DefaultProject = name
-	}
-}
-
-func (c *Config) GetProject(name string) *ProjectConfig {
-	for _, p := range c.Projects {
-		if p.Name == name {
-			return &p
-		}
-	}
-	return nil
-}
-
-func (c *Config) RemoveProject(name string) {
-	for i, p := range c.Projects {
-		if p.Name == name {
-			c.Projects = append(c.Projects[:i], c.Projects[i+1:]...)
-			if c.DefaultProject == name && len(c.Projects) > 0 {
-				c.DefaultProject = c.Projects[0].Name
-			}
-			break
-		}
-	}
-}
-
-
-// Input forms
-type inputForm struct {
-	inputs    []textinput.Model
-	focusIdx  int
-	submitBtn string
-	cancelBtn string
-}
-
-func newProjectForm() inputForm {
-	inputs := make([]textinput.Model, 2)
-
-	inputs[0] = textinput.New()
-	inputs[0].Placeholder = "Project name (e.g., production, staging)"
-	inputs[0].Focus()
-	inputs[0].Width = 40
-
-	inputs[1] = textinput.New()
-	inputs[1].Placeholder = "Hetzner Cloud API token"
-	inputs[1].Width = 50
-	inputs[1].EchoMode = textinput.EchoPassword
-	inputs[1].EchoCharacter = '•'
-
-	return inputForm{
-		inputs:    inputs,
-		focusIdx:  0,
-		submitBtn: "Add Project",
-		cancelBtn: "Cancel",
-	}
-}
-func getNumberForIndex(index int) string {
-	if index == 9 { // 10th item (0-indexed 9)
-		return "0"
-	}
-	return strconv.Itoa(index + 1)
-}
-
-func getIndexFromNumber(keyStr string) int {
-	switch keyStr {
-	case "1":
-		return 0
-	case "2":
-		return 1
-	case "3":
-		return 2
-	case "4":
-		return 3
-	case "5":
-		return 4
-	case "6":
-		return 5
-	case "7":
-		return 6
-	case "8":
-		return 7
-	case "9":
-		return 8
-	case "0":
-		return 9
-	default:
-		return -1
-	}
-}
-
-// Resource types for tabs
-type resourceType int
-
-const (
-	resourceServers resourceType = iota
-	resourceNetworks
-	resourceLoadBalancers
-	resourceVolumes
-)
 
 var resourceTabs = []string{"Servers", "Networks", "Load Balancers", "Volumes"}
 
 // Project list item
 type projectItem struct {
-	config    ProjectConfig
+	config    config.ProjectConfig
 	isDefault bool
 }
 
@@ -282,33 +105,8 @@ func (i volumeItem) Description() string {
 	return fmt.Sprintf("%s | %dGB | %s", status, i.volume.Size, i.volume.Location.Name)
 }
 
-// Main model
-type model struct {
-	state           state
-	config          *Config
-	tokenInput      textinput.Model
-	projectForm     inputForm
-	projectList     list.Model
-	client          *hcloud.Client
-	currentProject  string
-	activeTab       resourceType
-	lists           map[resourceType]list.Model
-	contextMenu     ctm.ContextMenu
-	help            help.Model
-	err             error
-	width           int
-	height          int
-	statusMessage   string
-	sessionInfo     ctm_serv.SessionInfo
-	loadedResources map[resourceType]bool
-	loadingResource resourceType
-	isLoading       bool
-}
 
 // Messages
-type configLoadedMsg struct {
-	config *Config
-}
 
 type resourcesLoadedMsg struct {
 	servers       []*hcloud.Server
@@ -317,7 +115,6 @@ type resourcesLoadedMsg struct {
 	volumes       []*hcloud.Volume
 }
 
-type projectSavedMsg struct{}
 
 type serversLoadedMsg struct {
 	servers []*hcloud.Server
@@ -336,28 +133,10 @@ type volumesLoadedMsg struct {
 }
 
 type resourceLoadStartMsg struct {
-	resourceType resourceType
+	resourceType model.ResourceType
 }
 
 // Commands
-func loadConfigCmd() tea.Cmd {
-	return func() tea.Msg {
-		config, err := loadConfig()
-		if err != nil {
-			return message.ErrorMsg{err}
-		}
-		return configLoadedMsg{config}
-	}
-}
-
-func saveConfigCmd(config *Config) tea.Cmd {
-	return func() tea.Msg {
-		if err := saveConfig(config); err != nil {
-			return message.ErrorMsg{err}
-		}
-		return projectSavedMsg{}
-	}
-}
 
 func loadResources(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
@@ -436,39 +215,21 @@ func loadVolumes(client *hcloud.Client) tea.Cmd {
 	}
 }
 
-func startResourceLoad(rt resourceType) tea.Cmd {
+func startResourceLoad(rt model.ResourceType) tea.Cmd {
 	return func() tea.Msg {
 		return resourceLoadStartMsg{resourceType: rt}
 	}
 }
 
-func (m *model) getResourceLoadCmd(rt resourceType) tea.Cmd {
-	if m.client == nil {
-		return nil
-	}
 
-	switch rt {
-	case resourceServers:
-		return loadServers(m.client)
-	case resourceNetworks:
-		return loadNetworks(m.client)
-	case resourceLoadBalancers:
-		return loadLoadBalancers(m.client)
-	case resourceVolumes:
-		return loadVolumes(m.client)
-	default:
-		return nil
-	}
-}
-
-func getResourceLabels(client *hcloud.Client, resourceType resourceType, resourceID int) tea.Cmd {
+func getResourceLabels(client *hcloud.Client, resourceType model.ResourceType, resourceID int) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 
 		var labels map[string]string
 
 		switch resourceType {
-		case resourceServers:
+		case model.ResourceServers:
 			server, _, err := client.Server.Get(ctx, strconv.Itoa(resourceID))
 			if err != nil {
 				return message.ErrorMsg{err}
@@ -478,7 +239,7 @@ func getResourceLabels(client *hcloud.Client, resourceType resourceType, resourc
 			}
 			labels = server.Labels
 
-		case resourceNetworks:
+		case model.ResourceNetworks:
 			network, _, err := client.Network.Get(ctx, strconv.Itoa(resourceID))
 			if err != nil {
 				return message.ErrorMsg{err}
@@ -488,7 +249,7 @@ func getResourceLabels(client *hcloud.Client, resourceType resourceType, resourc
 			}
 			labels = network.Labels
 
-		case resourceLoadBalancers:
+		case model.ResourceLoadBalancers:
 			lb, _, err := client.LoadBalancer.Get(ctx, strconv.Itoa(resourceID))
 			if err != nil {
 				return message.ErrorMsg{err}
@@ -498,7 +259,7 @@ func getResourceLabels(client *hcloud.Client, resourceType resourceType, resourc
 			}
 			labels = lb.Labels
 
-		case resourceVolumes:
+		case model.ResourceVolumes:
 			volume, _, err := client.Volume.Get(ctx, strconv.Itoa(resourceID))
 			if err != nil {
 				return message.ErrorMsg{err}
@@ -539,81 +300,17 @@ func clearStatusMessage() tea.Cmd {
 }
 
 
-func (m *model) executeContextAction(selectedAction string, resourceType resourceType, resourceID int) tea.Cmd {	
-	switch resourceType {
-	case resourceServers:
-		server, _, err := m.client.Server.Get(context.Background(), strconv.Itoa(resourceID))
-		
-		if err != nil {
-			return func() tea.Msg {
-				return message.ErrorMsg{err}
-			}
-		}
-
-		return ctm_serv.ExecuteServerContextAction(selectedAction, m.client, server)
-	}
-	return nil
-}
-
-func (m *model) executeContextActionOld(selectedAction string, server *hcloud.Server) tea.Cmd {
-	switch selectedAction {
-	case "copy_public_ip":
-		if server.PublicNet.IPv4.IP != nil {
-			return copyToClipboard(server.PublicNet.IPv4.IP.String())
-		}
-	case "show_labels":
-		if server.ID != 0 {
-			return getResourceLabels(m.client, resourceServers, server.ID)
-		}
-	case "copy_private_ip":
-		if len(server.PrivateNet) > 0 && server.PrivateNet[0].IP != nil {
-			return copyToClipboard(server.PrivateNet[0].IP.String())
-		}
-	case "ssh_tmux_window":
-		if server.PublicNet.IPv4.IP != nil {
-			return ctm_serv.LaunchSSHInTmuxWindow(server.PublicNet.IPv4.IP.String())
-		}
-	case "ssh_tmux_pane":
-		if server.PublicNet.IPv4.IP != nil {
-			return ctm_serv.launchSSHInTmuxPane(server.PublicNet.IPv4.IP.String())
-		}
-	case "ssh_zellij_tab":
-		if server.PublicNet.IPv4.IP != nil {
-			return ctm_serv.LaunchSSHInZellijTab(server.PublicNet.IPv4.IP.String())
-		}
-	case "ssh_zellij_pane":
-		if server.PublicNet.IPv4.IP != nil {
-			return ctm_serv.LaunchSSHInZellijPane(server.PublicNet.IPv4.IP.String())
-		}
-	case "ssh_new_terminal":
-		if server.PublicNet.IPv4.IP != nil {
-			return ctm_serv.LaunchSSH(server.PublicNet.IPv4.IP.String())
-		}
-	case "ssh_current_terminal":
-		if server.PublicNet.IPv4.IP != nil {
-			// Suspend lazyhetzner and run SSH in current terminal
-			return tea.ExecProcess(exec.Command("ssh", fmt.Sprintf("root@%s", server.PublicNet.IPv4.IP.String())), func(err error) tea.Msg {
-				if err != nil {
-					return message.ErrorMsg{err}
-				}
-				return sshLaunchedMsg{}
-			})
-		}
-	}
-	return nil
-}
-
-func initialModel() model {
+func initialModel() model.Model {
 	ti := textinput.New()
 	ti.Placeholder = "Enter your Hetzner Cloud API token..."
 	ti.Focus()
 	ti.CharLimit = 64
 	ti.Width = 50
 
-	lists := make(map[resourceType]list.Model)
-	loadedResources := make(map[resourceType]bool)
+	lists := make(map[model.ResourceType]list.Model)
+	loadedResources := make(map[model.ResourceType]bool)
 
-	return model{
+	return model.Model{
 		state:           stateProjectSelect,
 		tokenInput:      ti,
 		lists:           lists,
@@ -624,588 +321,6 @@ func initialModel() model {
 	}
 }
 
-func (m model) Init() tea.Cmd {
-	return tea.Batch(textinput.Blink, loadConfigCmd())
-}
-
-func (m *model) updateProjectList() {
-	items := make([]list.Item, len(m.config.Projects))
-	for i, project := range m.config.Projects {
-		items[i] = projectItem{
-			config:    project,
-			isDefault: project.Name == m.config.DefaultProject,
-		}
-	}
-
-	m.projectList = list.New(items, list.NewDefaultDelegate(), m.width-4, m.height-8)
-	m.projectList.Title = "Hetzner Cloud Projects"
-}
-
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-
-		// Update list sizes
-		for rt := range m.lists {
-			l := m.lists[rt]
-			l.SetWidth(msg.Width - 4)
-			l.SetHeight(msg.Height - 10)
-			m.lists[rt] = l
-		}
-
-		if m.config != nil {
-			m.updateProjectList()
-		}
-
-		// Update form inputs
-		for i := range m.projectForm.inputs {
-			m.projectForm.inputs[i].Width = min(50, msg.Width-10)
-		}
-
-	case configLoadedMsg:
-		m.config = msg.config
-		m.updateProjectList()
-
-		// If there's a default project, set it up but don't load resources yet
-		if m.config.DefaultProject != "" {
-			project := m.config.GetProject(m.config.DefaultProject)
-			if project != nil {
-				m.client = hcloud.NewClient(hcloud.WithToken(project.Token))
-				m.currentProject = project.Name
-				m.state = stateResourceView
-				// Load the first tab's resources
-				return m, tea.Batch(
-					startResourceLoad(m.activeTab),
-					m.getResourceLoadCmd(m.activeTab),
-				)
-			}
-		}
-
-		// If no projects, go to token input
-		if len(m.config.Projects) == 0 {
-			m.state = stateTokenInput
-		}
-	case tea.KeyMsg:
-		switch m.state {
-		case stateProjectSelect:
-			switch {
-			case key.Matches(msg, keys.Enter):
-				if selectedItem := m.projectList.SelectedItem(); selectedItem != nil {
-					if projectItem, ok := selectedItem.(projectItem); ok {
-						m.client = hcloud.NewClient(hcloud.WithToken(projectItem.config.Token))
-						m.currentProject = projectItem.config.Name
-						m.state = stateResourceView
-						// Reset loaded resources for new project
-						m.loadedResources = make(map[resourceType]bool)
-						// Load the first tab's resources
-						return m, tea.Batch(
-							startResourceLoad(m.activeTab),
-							m.getResourceLoadCmd(m.activeTab),
-						)
-					}
-				}
-			case key.Matches(msg, keys.Add):
-				m.projectForm = newProjectForm()
-				m.state = stateProjectManage
-
-			case key.Matches(msg, keys.Delete):
-				if selectedItem := m.projectList.SelectedItem(); selectedItem != nil {
-					if projectItem, ok := selectedItem.(projectItem); ok {
-						m.config.RemoveProject(projectItem.config.Name)
-						m.updateProjectList()
-						return m, saveConfigCmd(m.config)
-					}
-				}
-
-			case key.Matches(msg, keys.Quit):
-				return m, tea.Quit
-			}
-
-		case stateProjectManage:
-			switch {
-			case key.Matches(msg, keys.Tab):
-				m.projectForm.focusIdx = (m.projectForm.focusIdx + 1) % len(m.projectForm.inputs)
-				for i := range m.projectForm.inputs {
-					if i == m.projectForm.focusIdx {
-						m.projectForm.inputs[i].Focus()
-					} else {
-						m.projectForm.inputs[i].Blur()
-					}
-				}
-
-			case key.Matches(msg, keys.Enter):
-				// Submit form
-				name := strings.TrimSpace(m.projectForm.inputs[0].Value())
-				token := strings.TrimSpace(m.projectForm.inputs[1].Value())
-
-				if name != "" && token != "" {
-					m.config.AddProject(name, token)
-					m.updateProjectList()
-					m.state = stateProjectSelect
-					return m, saveConfigCmd(m.config)
-				}
-
-			case key.Matches(msg, keys.Quit):
-				m.state = stateProjectSelect
-			}
-
-		case stateTokenInput:
-			switch {
-			case key.Matches(msg, keys.Enter):
-				token := strings.TrimSpace(m.tokenInput.Value())
-				if token == "" {
-					return m, nil
-				}
-
-				m.client = hcloud.NewClient(hcloud.WithToken(token))
-				m.state = stateResourceView
-				// Reset loaded resources
-				m.loadedResources = make(map[resourceType]bool)
-				// Load the first tab's resources
-				return m, tea.Batch(
-					startResourceLoad(m.activeTab),
-					m.getResourceLoadCmd(m.activeTab),
-				)
-			case key.Matches(msg, keys.Quit):
-				if len(m.config.Projects) > 0 {
-					m.state = stateProjectSelect
-				} else {
-					return m, tea.Quit
-				}
-			}
-
-		case stateResourceView:
-			switch {
-			case key.Matches(msg, keys.Enter):
-				// Show context menu for servers
-				if m.activeTab == resourceServers {
-					if currentList, exists := m.lists[resourceServers]; exists {
-						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
-							if serverItem, ok := selectedItem.(serverItem); ok {
-								m.contextMenu = ctm.ContextMenu{
-									Items:        getSSHMenuItems(m.sessionInfo),
-									SelectedItem: 0,
-									Server:       serverItem.server,
-								}
-								m.state = stateContextMenu
-							}
-						}
-					}
-				}
-
-			case key.Matches(msg, keys.Tab):
-				m.activeTab = (m.activeTab + 1) % resourceType(len(resourceTabs))
-
-				// Load resources for new tab if not already loaded
-				if !m.loadedResources[m.activeTab] {
-					return m, tea.Batch(
-						startResourceLoad(m.activeTab),
-						m.getResourceLoadCmd(m.activeTab),
-					)
-				}
-			case key.Matches(msg, keys.Reload):
-				if m.client != nil {
-					// Mark current resource as not loaded and reload
-					m.loadedResources[m.activeTab] = false
-					return m, tea.Batch(
-						startResourceLoad(m.activeTab),
-						m.getResourceLoadCmd(m.activeTab),
-					)
-				}
-			case key.Matches(msg, keys.Left):
-				if m.activeTab > 0 {
-					m.activeTab--
-
-					// Load resources for new tab if not already loaded
-					if !m.loadedResources[m.activeTab] {
-						return m, tea.Batch(
-							startResourceLoad(m.activeTab),
-							m.getResourceLoadCmd(m.activeTab),
-						)
-					}
-				}
-			case key.Matches(msg, keys.Right):
-				if int(m.activeTab) < len(resourceTabs)-1 {
-					m.activeTab++
-
-					// Load resources for new tab if not already loaded
-					if !m.loadedResources[m.activeTab] {
-						return m, tea.Batch(
-							startResourceLoad(m.activeTab),
-							m.getResourceLoadCmd(m.activeTab),
-						)
-					}
-				}
-			case key.Matches(msg, keys.Quit):
-				m.state = stateProjectSelect
-			}
-
-		case stateContextMenu:
-			switch {
-			case key.Matches(msg, keys.Up):
-				if m.contextMenu.SelectedItem > 0 {
-					m.contextMenu.SelectedItem--
-				}
-
-			case key.Matches(msg, keys.Down):
-				if m.contextMenu.SelectedItem < len(m.contextMenu.Items)-1 {
-					m.contextMenu.SelectedItem++
-				}
-
-			case key.Matches(msg, keys.Enter):
-				selectedAction := m.contextMenu.Items[m.contextMenu.SelectedItem].Action
-				server := m.contextMenu.Server
-				m.state = stateResourceView
-				return m, m.executeContextAction(selectedAction, server)
-
-			case key.Matches(msg, keys.Num1, keys.Num2, keys.Num3, keys.Num4, keys.Num5,
-				keys.Num6, keys.Num7, keys.Num8, keys.Num9, keys.Num0):
-
-				keyStr := msg.String()
-				selectedIndex := getIndexFromNumber(keyStr)
-
-				// Check if the number corresponds to a valid menu item
-				if selectedIndex >= 0 && selectedIndex < len(m.contextMenu.Items) {
-					selectedAction := m.contextMenu.Items[selectedIndex].Action
-					server := m.contextMenu.Server
-					m.state = stateResourceView
-					return m, m.executeContextAction(selectedAction, server)
-				}
-
-			case key.Matches(msg, keys.Quit):
-				m.state = stateResourceView
-			}
-
-		case stateError:
-			if key.Matches(msg, keys.Quit) {
-				return m, tea.Quit
-			}
-		}
-
-	case projectSavedMsg:
-		m.statusMessage = "✅ Project configuration saved"
-		return m, clearStatusMessage()
-
-	case resourceLoadStartMsg:
-		m.isLoading = true
-		m.loadingResource = msg.resourceType
-
-	case serversLoadedMsg:
-		m.isLoading = false
-		m.loadedResources[resourceServers] = true
-
-		// Create server list
-		serverItems := make([]list.Item, len(msg.servers))
-		for i, server := range msg.servers {
-			serverItems[i] = serverItem{server: server}
-		}
-
-		serversList := list.New(serverItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
-		serversList.Title = "Servers"
-		m.lists[resourceServers] = serversList
-
-	case networksLoadedMsg:
-		m.isLoading = false
-		m.loadedResources[resourceNetworks] = true
-
-		// Create network list
-		networkItems := make([]list.Item, len(msg.networks))
-		for i, network := range msg.networks {
-			networkItems[i] = networkItem{network: network}
-		}
-
-		networksList := list.New(networkItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
-		networksList.Title = "Networks"
-		m.lists[resourceNetworks] = networksList
-
-	case loadBalancersLoadedMsg:
-		m.isLoading = false
-		m.loadedResources[resourceLoadBalancers] = true
-
-		// Create load balancer list
-		lbItems := make([]list.Item, len(msg.loadBalancers))
-		for i, lb := range msg.loadBalancers {
-			lbItems[i] = loadBalancerItem{lb: lb}
-		}
-
-		lbList := list.New(lbItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
-		lbList.Title = "Load Balancers"
-		m.lists[resourceLoadBalancers] = lbList
-
-	case volumesLoadedMsg:
-		m.isLoading = false
-		m.loadedResources[resourceVolumes] = true
-
-		// Create volume list
-		volumeItems := make([]list.Item, len(msg.volumes))
-		for i, volume := range msg.volumes {
-			volumeItems[i] = volumeItem{volume: volume}
-		}
-
-		volumesList := list.New(volumeItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
-		volumesList.Title = "Volumes"
-		m.lists[resourceVolumes] = volumesList
-
-	case message.ClipboardCopiedMsg:
-		m.statusMessage = fmt.Sprintf("✅ Copied %s to clipboard", string(msg))
-		return m, clearStatusMessage()
-
-	case sshLaunchedMsg:
-		m.statusMessage = "🚀 SSH session launched"
-		return m, clearStatusMessage()
-	case tmuxSSHLaunchedMsg:
-		m.statusMessage = "🪟 SSH session launched in tmux"
-		return m, clearStatusMessage()
-
-	case zellijSSHLaunchedMsg:
-		m.statusMessage = "📱 SSH session launched in zellij"
-		return m, clearStatusMessage()
-
-	case message.StatusMsg:
-		m.statusMessage = string(msg)
-
-	case message.ErrorMsg:
-		m.state = stateError
-		m.err = msg.err
-	}
-
-	// Update components
-	if m.state == stateTokenInput {
-		var cmd tea.Cmd
-		m.tokenInput, cmd = m.tokenInput.Update(msg)
-		return m, cmd
-	}
-
-	if m.state == stateProjectSelect && m.config != nil {
-		var cmd tea.Cmd
-		m.projectList, cmd = m.projectList.Update(msg)
-		return m, cmd
-	}
-
-	if m.state == stateProjectManage {
-		var cmd tea.Cmd
-		m.projectForm.inputs[m.projectForm.focusIdx], cmd = m.projectForm.inputs[m.projectForm.focusIdx].Update(msg)
-		return m, cmd
-	}
-
-	if m.state == stateResourceView {
-		if currentList, exists := m.lists[m.activeTab]; exists {
-			var cmd tea.Cmd
-			m.lists[m.activeTab], cmd = currentList.Update(msg)
-			return m, cmd
-		}
-	}
-
-	return m, nil
-}
-
-func (m model) View() string {
-	switch m.state {
-	case stateProjectSelect:
-		if m.config == nil {
-			return fmt.Sprintf(
-				"\n%s\n\n%s\n",
-				titleStyle.Render("lazyhetzner"),
-				infoStyle.Render("Loading configuration..."),
-			)
-		}
-
-		if len(m.config.Projects) == 0 {
-			return fmt.Sprintf(
-				"\n%s\n\n%s\n\n%s\n",
-				titleStyle.Render("lazyhetzner"),
-				warningStyle.Render("No projects configured yet."),
-				helpStyle.Render("Press 'a' to add your first project • Press q to quit"),
-			)
-		}
-
-		// Status message
-		statusView := ""
-		if m.statusMessage != "" {
-			statusView = "\n" + successStyle.Render(m.statusMessage)
-		}
-
-		return fmt.Sprintf(
-			"\n%s\n\n%s%s\n\n%s\n",
-			titleStyle.Render("lazyhetzner"),
-			m.projectList.View(),
-			statusView,
-			helpStyle.Render("Enter: select project • a: add project • d: delete project • q: quit"),
-		)
-
-	case stateProjectManage:
-		var formView strings.Builder
-		formView.WriteString("Add New Project\n\n")
-
-		for i, input := range m.projectForm.inputs {
-			var style lipgloss.Style
-			if i == m.projectForm.focusIdx {
-				style = focusedStyle
-			} else {
-				style = blurredStyle
-			}
-
-			label := "Project Name:"
-			if i == 1 {
-				label = "API Token:"
-			}
-
-			formView.WriteString(fmt.Sprintf("%s\n%s\n\n", label, style.Render(input.View())))
-		}
-
-		formView.WriteString(helpStyle.Render("Tab: next field • Enter: save • Esc: cancel"))
-
-		return fmt.Sprintf(
-			"\n%s\n\n%s\n",
-			titleStyle.Render("lazyhetzner - Add Project"),
-			formView.String(),
-		)
-
-	case stateTokenInput:
-		return fmt.Sprintf(
-			"\n%s\n\n%s\n\n%s\n\n%s\n",
-			titleStyle.Render("lazyhetzner"),
-			infoStyle.Render("Enter API token for one-time access:"),
-			m.tokenInput.View(),
-			helpStyle.Render("Press Enter to continue • Press q to go back"),
-		)
-
-	case stateLoading:
-		return fmt.Sprintf(
-			"\n%s\n\n%s\n",
-			titleStyle.Render("lazyhetzner"),
-			infoStyle.Render("Loading resources..."),
-		)
-
-	case stateResourceView:
-		// Project header
-		projectHeader := fmt.Sprintf("Project: %s", m.currentProject)
-		if m.currentProject == "" {
-			projectHeader = "One-time Access"
-		}
-
-		// Render tabs
-		var tabs []string
-		for i, tab := range resourceTabs {
-			if resourceType(i) == m.activeTab {
-				// Show loading indicator in active tab if loading
-				if m.isLoading && m.loadingResource == resourceType(i) {
-					tabs = append(tabs, titleStyle.Render(tab+" (loading...)"))
-				} else {
-					tabs = append(tabs, titleStyle.Render(tab))
-				}
-			} else {
-				tabs = append(tabs, helpStyle.Render(tab))
-			}
-		}
-		tabsView := strings.Join(tabs, " ")
-
-		// Render current list or loading message
-		var listView string
-		if m.isLoading && m.loadingResource == m.activeTab {
-			listView = infoStyle.Render("Loading " + strings.ToLower(resourceTabs[m.activeTab]) + "...")
-		} else if currentList, exists := m.lists[m.activeTab]; exists {
-			listView = currentList.View()
-		} else if !m.loadedResources[m.activeTab] {
-			listView = helpStyle.Render("Resources not loaded yet. Loading will start automatically.")
-		} else {
-			listView = helpStyle.Render("No " + strings.ToLower(resourceTabs[m.activeTab]) + " found.")
-		}
-
-		// Status message
-		statusView := ""
-		if m.statusMessage != "" {
-			statusView = "\n" + successStyle.Render(m.statusMessage)
-		}
-
-		helpText := "Tab: switch view • ←/→: navigate tabs • Enter: actions • r: reload resources • q: back to projects"
-		if m.activeTab == resourceServers {
-			helpText = "Tab: switch view • ←/→: navigate tabs • Enter: server actions • r: reload resources • q: back to projects"
-		}
-
-		return fmt.Sprintf(
-			"%s\n%s\n\n%s%s\n\n%s",
-			infoStyle.Render(projectHeader),
-			tabsView,
-			listView,
-			statusView,
-			helpStyle.Render(helpText),
-		)
-
-	case stateContextMenu:
-		// Render the current resource view in background
-		projectHeader := fmt.Sprintf("Project: %s", m.currentProject)
-		if m.currentProject == "" {
-			projectHeader = "One-time Access"
-		}
-
-		var tabs []string
-		for i, tab := range resourceTabs {
-			if resourceType(i) == m.activeTab {
-				tabs = append(tabs, titleStyle.Render(tab))
-			} else {
-				tabs = append(tabs, helpStyle.Render(tab))
-			}
-		}
-		tabsView := strings.Join(tabs, " ")
-
-		var listView string
-		if currentList, exists := m.lists[m.activeTab]; exists {
-			listView = currentList.View()
-		}
-
-		// Render context menu with number shortcuts
-		var menuItems []string
-		for i, item := range m.contextMenu.items {
-			// Get the number for this item (1-indexed, with 0 for 10th)
-			numberStr := getNumberForIndex(i)
-
-			// Create the menu item with number prefix
-			menuText := fmt.Sprintf("[%s] %s", numberStr, item.label)
-
-			if i == m.contextMenu.selectedItem {
-				menuItems = append(menuItems, selectedMenuStyle.Render(menuText))
-			} else {
-				menuItems = append(menuItems, menuText)
-			}
-		}
-
-		menuContent := strings.Join(menuItems, "\n")
-
-		// Add help text about number shortcuts
-		helpText := "\nPress number keys for quick selection • ↑/↓ to navigate • Enter to select • Esc to cancel"
-		menu := menuStyle.Render(fmt.Sprintf("Actions for %s:\n\n%s%s",
-			m.contextMenu.server.Name,
-			menuContent,
-			helpStyle.Render(helpText)))
-
-		// Center the menu
-		menuOverlay := lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, menu)
-
-		background := fmt.Sprintf("%s\n%s\n\n%s", infoStyle.Render(projectHeader), tabsView, listView)
-
-		return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, background) + menuOverlay
-	case stateError:
-		return fmt.Sprintf(
-			"\n%s\n\n%s\n\n%s\n",
-			titleStyle.Render("lazyhetzner - Error"),
-			errorStyle.Render(fmt.Sprintf("Error: %v", m.err)),
-			helpStyle.Render("Press q to quit"),
-		)
-	}
-
-	return ""
-}
-
-// Helper function for min (Go 1.21+)
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
 
 func App() {
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())

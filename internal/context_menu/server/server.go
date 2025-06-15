@@ -221,7 +221,7 @@ func launchSSHInSameTerminal(ip string) tea.Cmd {
 }
 
 
-//func (m *model) initSessionInfo() {
+//func (m *model.Model) initSessionInfo() {
 //	m.sessionInfo = detectSession()
 //}
 
@@ -261,7 +261,7 @@ func handleSSHAction(Action string, server *hcloud.Server, sessionInfo SessionIn
 }
 
 
-func (m *model) ExecuteServerContextAction(selectedAction string, server *hcloud.Server) tea.Cmd {
+func ExecuteServerContextAction(selectedAction string, server *hcloud.Server) tea.Cmd {
 	sessionInfo := detectSession()
 
 	// Handle SSH actions based on the selected action

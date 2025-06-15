@@ -1,4 +1,4 @@
-package cmd
+package model
 // App states
 type state int
 
