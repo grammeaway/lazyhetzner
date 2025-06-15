@@ -21,6 +21,21 @@ const (
 	ResourceVolumes
 )
 
+func GetResourceNameFromType(rt ResourceType) string {
+	switch rt {
+	case ResourceServers:
+		return "Servers"
+	case ResourceNetworks:
+		return "Networks"
+	case ResourceLoadBalancers:
+		return "Load Balancers"
+	case ResourceVolumes:
+		return "Volumes"
+	default:
+		return "Unknown Resource"
+	}
+}
+
 func loadResources(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
