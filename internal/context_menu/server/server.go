@@ -221,11 +221,9 @@ func launchSSHInSameTerminal(ip string) tea.Cmd {
 }
 
 
-//func (m *model.Model) initSessionInfo() {
-//	m.sessionInfo = detectSession()
-//}
 
-func createServerContextMenu(server *hcloud.Server, sessionInfo SessionInfo) ctm.ContextMenu {
+func CreateServerContextMenu(server *hcloud.Server) ctm.ContextMenu {
+	sessionInfo := detectSession()
 	return ctm.ContextMenu{
 		Items:        getSSHMenuItems(sessionInfo),
 		SelectedItem: 0,

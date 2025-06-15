@@ -1,7 +1,6 @@
 package model
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/key"
 )
 

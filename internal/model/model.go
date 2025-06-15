@@ -3,11 +3,7 @@ package model
 import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"fmt"
 	"strconv"
-	"strings"
-	"github.com/charmbracelet/bubbles/key"
 	"lazyhetzner/internal/config"
 	ctm "lazyhetzner/internal/context_menu"
 	ctm_serv "lazyhetzner/internal/context_menu/server"

@@ -7,7 +7,7 @@ import (
 
 
 
-func newProjectForm() input_form.InputForm {
+func NewProjectForm() input_form.InputForm {
 	inputs := make([]textinput.Model, 2)
 
 	inputs[0] = textinput.New()

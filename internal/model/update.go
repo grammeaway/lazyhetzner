@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strings"
 	"lazyhetzner/internal/config"
-	"lazyhetzner/internal/context_menu"
+	ctm "lazyhetzner/internal/context_menu"
 	ctm_serv "lazyhetzner/internal/context_menu/server"
 	"lazyhetzner/internal/input_form"
+	"lazyhetzner/internal/input_form/project"
 	"lazyhetzner/internal/message"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/help"
@@ -75,7 +76,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.currentProject = projectItem.config.Name
 						m.state = stateResourceView
 						// Reset loaded resources for new project
-						m.loadedResources = make(map[resourceType]bool)
+						m.loadedResources = make(map[ResourceType]bool)
 						// Load the first tab's resources
 						return m, tea.Batch(
 							startResourceLoad(m.activeTab),
@@ -84,7 +85,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			case key.Matches(msg, keys.Add):
-				m.projectForm = newProjectForm()
+				m.projectForm = project.NewProjectForm()
 				m.state = stateProjectManage
 
 			case key.Matches(msg, keys.Delete):
@@ -103,19 +104,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case stateProjectManage:
 			switch {
 			case key.Matches(msg, keys.Tab):
-				m.projectForm.focusIdx = (m.projectForm.focusIdx + 1) % len(m.projectForm.inputs)
-				for i := range m.projectForm.inputs {
-					if i == m.projectForm.focusIdx {
-						m.projectForm.inputs[i].Focus()
+				m.projectForm.FocusIdx = (m.projectForm.FocusIdx + 1) % len(m.projectForm.Inputs)
+				for i := range m.projectForm.Inputs {
+					if i == m.projectForm.FocusIdx {
+						m.projectForm.Inputs[i].Focus()
 					} else {
-						m.projectForm.inputs[i].Blur()
+						m.projectForm.Inputs[i].Blur()
 					}
 				}
 
 			case key.Matches(msg, keys.Enter):
 				// Submit form
-				name := strings.TrimSpace(m.projectForm.inputs[0].Value())
-				token := strings.TrimSpace(m.projectForm.inputs[1].Value())
+				name := strings.TrimSpace(m.projectForm.Inputs[0].Value())
+				token := strings.TrimSpace(m.projectForm.Inputs[1].Value())
 
 				if name != "" && token != "" {
 					m.config.AddProject(name, token)
@@ -139,7 +140,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.client = hcloud.NewClient(hcloud.WithToken(token))
 				m.state = stateResourceView
 				// Reset loaded resources
-				m.loadedResources = make(map[resourceType]bool)
+				m.loadedResources = make(map[ResourceType]bool)
 				// Load the first tab's resources
 				return m, tea.Batch(
 					startResourceLoad(m.activeTab),
@@ -161,11 +162,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if currentList, exists := m.lists[resourceServers]; exists {
 						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
 							if serverItem, ok := selectedItem.(serverItem); ok {
-								m.contextMenu = ctm.ContextMenu{
-									Items:        getSSHMenuItems(m.sessionInfo),
-									SelectedItem: 0,
-									Server:       serverItem.server,
-								}
+								m.contextMenu = ctm_serv.CreateServerContextMenu(serverItem.server) 
+							}
 								m.state = stateContextMenu
 							}
 						}
