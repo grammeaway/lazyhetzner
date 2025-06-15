@@ -10,6 +10,7 @@ import (
  	"lazyhetzner/internal/message"
 	ctm "lazyhetzner/internal/context_menu"
 	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/atotto/clipboard"
 )
 
 // SessionType represents the type of terminal multiplexer session
@@ -271,11 +272,21 @@ func ExecuteServerContextAction(selectedAction string, server *hcloud.Server) te
 	switch selectedAction {
 	case "copy_public_ip":
 		return func() tea.Msg {
+			if server.PublicNet.IPv4.IP == nil {
+				return message.ErrorMsg{fmt.Errorf("server has no public IP")}
+			}
+			if err := clipboard.WriteAll(server.PublicNet.IPv4.IP.String()); err != nil {
+				return message.ErrorMsg{err}
+			}
 			return message.ClipboardCopiedMsg(server.PublicNet.IPv4.IP.String())
 		}
 	case "copy_private_ip":
 		if server.PrivateNet[0].IP != nil {
 			return func() tea.Msg {
+				if err := clipboard.WriteAll(server.PrivateNet[0].IP.String()); err != nil {
+					return message.ErrorMsg{err}
+				}
+
 				return message.ClipboardCopiedMsg(server.PrivateNet[0].IP.String())
 			}
 		}
