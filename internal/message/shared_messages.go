@@ -12,5 +12,5 @@ type StatusMsg string
 type ClipboardCopiedMsg string
 
 
-
+type CancelCtxMenuMsg struct{}
 

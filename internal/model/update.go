@@ -6,6 +6,7 @@ import (
 	"strings"
 	"lazyhetzner/internal/config"
 	ctm_serv "lazyhetzner/internal/context_menu/server"
+	ctm_n "lazyhetzner/internal/context_menu/network"
 	"lazyhetzner/internal/input_form/project"
 	"lazyhetzner/internal/message"
 	tea "github.com/charmbracelet/bubbletea"
@@ -186,7 +187,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch {
 			case key.Matches(msg, keys.Enter):
 				// Show context menu for servers
-				if m.activeTab == resource.ResourceServers {
+				switch m.activeTab {
+				case resource.ResourceServers:
 					if currentList, exists := m.Lists[resource.ResourceServers]; exists {
 						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
 							if serverItem, ok := selectedItem.(r_serv.ServerItem); ok {
@@ -195,7 +197,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							}
 						}
 					}
-				}
+				case resource.ResourceNetworks:
+					if currentList, exists := m.Lists[resource.ResourceNetworks]; exists {
+						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
+							if networkItem, ok := selectedItem.(r_n.NetworkItem); ok {
+								m.contextMenu = ctm_n.CreateNetworkContextMenu(networkItem.Network)
+								m.State = stateContextMenu
+							}
+						}
+					}
+}				
 
 			case key.Matches(msg, keys.Tab):
 				m.activeTab = (m.activeTab + 1) % resource.ResourceType(len(resourceTabs))
@@ -316,7 +327,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Create network list
 		networkItems := make([]list.Item, len(msg.Networks))
 		for i, network := range msg.Networks {
-			networkItems[i] = r_n.NetworkItem{Network: network}
+			networkItems[i] = r_n.NetworkItem{
+				Network: network,
+				ResourceType: resource.ResourceNetworks,
+				ResourceID:   network.ID,
+			}
 		}
 
 		networksList := list.New(networkItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
@@ -371,6 +386,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loadedLabels = msg.Labels
 		m.labelsPertainingToResource = msg.RelatedResourceName
 		m.State = stateLabelView
+	case message.CancelCtxMenuMsg:
+		// close the context menu and return to resource view
+		m.State = stateResourceView
 
 	case message.StatusMsg:
 		m.statusMessage = string(msg)

@@ -6,6 +6,7 @@ import (
 	"github.com/hetznercloud/hcloud-go/hcloud"
 	"lazyhetzner/internal/message"
 	tea "github.com/charmbracelet/bubbletea"
+	"lazyhetzner/internal/resource"
 )
 
 type NetworksLoadedMsg struct {
@@ -16,6 +17,9 @@ type NetworksLoadedMsg struct {
 
 type NetworkItem struct {
 	Network *hcloud.Network
+
+	ResourceType resource.ResourceType
+	ResourceID   int
 }
 
 func (i NetworkItem) FilterValue() string { return i.Network.Name }

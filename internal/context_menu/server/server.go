@@ -279,10 +279,10 @@ func ExecuteServerContextAction(selectedAction string, server *hcloud.Server) te
 
 	// Handle other actions here if needed
 	switch selectedAction {
-	//case "cancel":
-	//	return func() tea.Msg {
-	//		return message.ContextMenuCancelledMsg{}
-	//	}
+	case "cancel":
+		return func() tea.Msg {
+			return message.CancelCtxMenuMsg{}
+		}
 	case "view_labels":
 		labels := getServerLabels(server)
 		if len(labels) == 0 {

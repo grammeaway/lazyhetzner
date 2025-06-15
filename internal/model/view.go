@@ -143,7 +143,7 @@ func (m Model) View() string {
 	case stateLabelView:
 		// Render the label View
 		var labelView strings.Builder
-		labelView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("lazyhetzner - Labels")))
+		labelView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("Labels")))
 
 		// Resource info with better styling
 		resourceInfo := fmt.Sprintf("📋 Labels for %s", m.labelsPertainingToResource)
