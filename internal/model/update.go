@@ -301,6 +301,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case resource.ResourceLoadStartMsg:
 		m.IsLoading = true
 		m.loadingResource = msg.ResourceType
+		return m, nil
 
 	case r_serv.ServersLoadedMsg:
 		m.IsLoading = false
@@ -319,6 +320,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		serversList := list.New(serverItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		serversList.Title = "Servers"
 		m.Lists[resource.ResourceServers] = serversList
+		return m, nil
 
 	case r_n.NetworksLoadedMsg:
 		m.IsLoading = false
@@ -337,6 +339,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		networksList := list.New(networkItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		networksList.Title = "Networks"
 		m.Lists[resource.ResourceNetworks] = networksList
+		return m, nil
 
 	case r_lb.LoadBalancersLoadedMsg:
 		m.IsLoading = false
@@ -351,6 +354,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		lbList := list.New(lbItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		lbList.Title = "Load Balancers"
 		m.Lists[resource.ResourceLoadBalancers] = lbList
+	        return m, nil
 
 	case r_vol.VolumesLoadedMsg:
 		m.IsLoading = false
@@ -365,6 +369,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		volumesList := list.New(volumeItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		volumesList.Title = "Volumes"
 		m.Lists[resource.ResourceVolumes] = volumesList
+		return m, nil
 
 	case message.ClipboardCopiedMsg:
 		m.statusMessage = fmt.Sprintf("✅ Copied %s to clipboard", string(msg))
@@ -386,16 +391,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loadedLabels = msg.Labels
 		m.labelsPertainingToResource = msg.RelatedResourceName
 		m.State = stateLabelView
+		return m, nil
 	case message.CancelCtxMenuMsg:
 		// close the context menu and return to resource view
 		m.State = stateResourceView
+		return m, nil
 
 	case message.StatusMsg:
 		m.statusMessage = string(msg)
+		return m, clearStatusMessage()
 
 	case message.ErrorMsg:
 		m.State = stateError
 		m.err = msg.Err
+		return m, nil
 	}
 
 	// Update components
