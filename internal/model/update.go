@@ -104,6 +104,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// From context menu, go back to resource view
 				m.State = stateResourceView
 				return m, nil
+			case stateLoadBalancerTargetView:
+				// From load balancer target view, go back to resource view 
+				m.State = stateResourceView 
+				return m, nil 
+			case stateLoadBalancerServiceView:
+				// From load balancer service view, go back to resource view 
+				m.State = stateResourceView 
+				return m, nil 
+			
 			}
 		}
 
@@ -370,7 +379,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		lbList.Title = "Load Balancers"
 		m.Lists[resource.ResourceLoadBalancers] = lbList
 	        return m, nil
-
+	
 	case r_vol.VolumesLoadedMsg:
 		m.IsLoading = false
 		m.LoadedResources[resource.ResourceVolumes] = true
@@ -407,6 +416,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.labelsPertainingToResource = msg.RelatedResourceName
 		m.State = stateLabelView
 		return m, nil
+
+	case r_lb.ViewLoadbalancerTargetsMsg:
+		m.IsLoading = false
+		m.loadbalancerBeingViewed = msg.LoadBalancer
+		m.loadbalancerTargets = msg.Targets
+		m.State = stateLoadBalancerTargetView 
+		return m, nil
+
+	case r_lb.ViewLoadbalancerServicesMsg:
+		m.IsLoading = false 
+		m.loadbalancerBeingViewed = msg.LoadBalancer 
+		m.loadbalancerServices = msg.Services 
+		m.State = stateLoadBalancerServiceView 
+		return m, nil 
+
 	case message.CancelCtxMenuMsg:
 		// close the context menu and return to resource view
 		m.State = stateResourceView

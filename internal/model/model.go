@@ -47,6 +47,9 @@ type Model struct {
 	IsLoading       bool
 	loadedLabels map[string]string
 	labelsPertainingToResource string
+	loadbalancerBeingViewed *hcloud.LoadBalancer
+	loadbalancerTargets []hcloud.LoadBalancerTarget
+	loadbalancerServices []hcloud.LoadBalancerService
 }
 
 // Resource types for tabs

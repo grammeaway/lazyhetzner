@@ -10,5 +10,7 @@ const (
 	stateResourceView
 	stateLabelView
 	stateContextMenu
+	stateLoadBalancerServiceView
+	stateLoadBalancerTargetView
 	stateError
 )

@@ -16,7 +16,15 @@ type LoadBalancersLoadedMsg struct {
 }
 
 
+type ViewLoadbalancerTargetsMsg struct {
+	LoadBalancer *hcloud.LoadBalancer
+	Targets []hcloud.LoadBalancerTarget
+}
 
+type ViewLoadbalancerServicesMsg struct {
+	LoadBalancer *hcloud.LoadBalancer
+	Services []hcloud.LoadBalancerService
+}
 
 type LoadBalancerItem struct {
 	Lb *hcloud.LoadBalancer
