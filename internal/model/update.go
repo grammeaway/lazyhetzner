@@ -386,6 +386,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMessage = "📱 SSH session launched in zellij"
 		return m, clearStatusMessage()
 
+
+
 	case r_label.LabelsLoadedMsg:
 		m.IsLoading = false
 		m.loadedLabels = msg.Labels

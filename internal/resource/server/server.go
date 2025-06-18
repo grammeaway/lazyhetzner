@@ -12,12 +12,6 @@ import (
 )
 
 
-type ServersLoadedMsg struct {
-	Servers []*hcloud.Server
-}
-
-
-
 type ServerItem struct {
 	Server *hcloud.Server
 	ResourceType resource.ResourceType
@@ -50,5 +44,27 @@ func LoadServers(client *hcloud.Client) tea.Cmd {
 			return message.ErrorMsg{err}
 		}
 		return ServersLoadedMsg{Servers: servers}
+	}
+}
+
+func CreateServerSnapshot(client *hcloud.Client, server *hcloud.Server, name *string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		createOpts := hcloud.ServerCreateImageOpts{
+			Description: name,
+			Type: hcloud.ImageTypeSnapshot,
+			Labels: map[string]string{
+		"created_by": "lazyhetzner",
+			},
+		}
+		snapshot, _, err := client.Server.CreateImage(ctx, server, &createOpts)
+		if err != nil {
+			return message.ErrorMsg{err}
+		}
+		return ServerSnapshotCreationStartedMsg {
+			Server:        server,
+			SnapshotName: snapshot.Image.Description,
+
+		}
 	}
 }

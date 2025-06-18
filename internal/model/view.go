@@ -5,6 +5,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"lazyhetzner/internal/resource"
 	util "lazyhetzner/utility"
+	"lazyhetzner/internal/input_form/server/snapshot"
 	"strings"
 )
 
@@ -197,6 +198,8 @@ func (m Model) View() string {
 		labelView.WriteString("\n" + helpStyle.Render(helpText))
 
 		return labelView.String()
+
+
 	case stateContextMenu:
 		// Render the current resource view in background
 		projectHeader := fmt.Sprintf("Project: %s", m.currentProject)

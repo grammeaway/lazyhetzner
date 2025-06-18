@@ -11,4 +11,5 @@ const (
 	stateLabelView
 	stateContextMenu
 	stateError
+	stateCreateServerSnapshot
 )

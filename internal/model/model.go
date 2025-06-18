@@ -30,6 +30,9 @@ type Model struct {
 	config          *config.Config
 	TokenInput      textinput.Model
 	projectForm     input_form.InputForm
+	serverSnapshotForm input_form.InputForm
+	serverToSnapshot *hcloud.Server
+	snapshotNameInput textinput.Model
 	projectList     list.Model
 	client          *hcloud.Client
 	currentProject  string

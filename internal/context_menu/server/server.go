@@ -31,6 +31,11 @@ type TmuxSSHLaunchedMsg struct{}
 
 type ZellijSSHLaunchedMsg struct{}
 
+
+type CreateServerSnapshotMsg struct {
+	Server *hcloud.Server
+}
+
 // SessionInfo holds information about the current session
 type SessionInfo struct {
 	Type        SessionType
@@ -79,6 +84,7 @@ func getServerMenuItems(sessionInfo SessionInfo) []ctm.ContextMenuItem {
 		{Label: "🔖 View Labels", Action: "view_labels"},
 		{Label: "📋 Copy Public IP", Action: "copy_public_ip"},
 		{Label: "📋 Copy Private IP", Action: "copy_private_ip"},
+		{Label: "📸 Create Snapshot", Action: "create_snapshot"},
 	}
 
 	switch sessionInfo.Type {
