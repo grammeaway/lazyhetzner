@@ -9,6 +9,7 @@ import (
 	ctm "lazyhetzner/internal/context_menu"
 	ctm_serv "lazyhetzner/internal/context_menu/server"
 	ctm_n "lazyhetzner/internal/context_menu/network"
+	ctm_lb "lazyhetzner/internal/context_menu/loadbalancer"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/hetznercloud/hcloud-go/hcloud"
@@ -107,6 +108,19 @@ func (m *Model) executeContextAction(selectedAction string, resourceType resourc
 			}
 		}
 		return ctm_n.ExecuteNetworkContextAction(selectedAction, network)
+	case resource.ResourceLoadBalancers:
+		loadBalancer, _, err := m.client.LoadBalancer.Get(context.Background(), strconv.Itoa(resourceID))
+		if err != nil {
+			return func() tea.Msg {
+				return message.ErrorMsg{err}
+			}
+		}
+		if loadBalancer == nil {
+			return func() tea.Msg {
+				return message.ErrorMsg{fmt.Errorf("load balancer with ID %d not found", resourceID)}
+			}
+		}
+		return ctm_lb.ExecuteLoadbalancerContextAction(selectedAction, loadBalancer)
 	}
 
 	return nil

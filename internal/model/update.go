@@ -7,6 +7,7 @@ import (
 	"lazyhetzner/internal/config"
 	ctm_serv "lazyhetzner/internal/context_menu/server"
 	ctm_n "lazyhetzner/internal/context_menu/network"
+	ctm_lb "lazyhetzner/internal/context_menu/loadbalancer"
 	"lazyhetzner/internal/input_form/project"
 	"lazyhetzner/internal/message"
 	tea "github.com/charmbracelet/bubbletea"
@@ -206,6 +207,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							}
 						}
 					}
+
+				case resource.ResourceLoadBalancers:
+					if currentList, exists := m.Lists[resource.ResourceLoadBalancers]; exists {
+						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
+							if lbItem, ok := selectedItem.(r_lb.LoadBalancerItem); ok {
+								m.contextMenu = ctm_lb.CreateLoadbalancerContextMenu(lbItem.Lb)
+								m.State = stateContextMenu
+							}
+						}
+					}
 }				
 
 			case key.Matches(msg, keys.Tab):
@@ -348,7 +359,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Create load balancer list
 		lbItems := make([]list.Item, len(msg.LoadBalancers))
 		for i, lb := range msg.LoadBalancers {
-			lbItems[i] = r_lb.LoadBalancerItem{Lb: lb}
+			lbItems[i] = r_lb.LoadBalancerItem{
+				Lb: lb,
+				ResourceType: resource.ResourceLoadBalancers,
+				ResourceID:   lb.ID,
+			}
 		}
 
 		lbList := list.New(lbItems, list.NewDefaultDelegate(), m.width-4, m.height-10)

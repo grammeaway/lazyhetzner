@@ -78,7 +78,10 @@ func getServerMenuItems(sessionInfo SessionInfo) []ctm.ContextMenuItem {
 		{Label: "❌ Cancel", Action: "cancel"},
 		{Label: "🔖 View Labels", Action: "view_labels"},
 		{Label: "📋 Copy Public IP", Action: "copy_public_ip"},
+		// ipv6
+		{Label: "📋 Copy Public IPv6", Action: "copy_public_ipv6"}, // Assuming IPv6 is also available
 		{Label: "📋 Copy Private IP", Action: "copy_private_ip"},
+
 	}
 
 	switch sessionInfo.Type {
@@ -307,6 +310,19 @@ func ExecuteServerContextAction(selectedAction string, server *hcloud.Server) te
 			}
 			return message.ClipboardCopiedMsg(server.PublicNet.IPv4.IP.String())
 		}
+	case "copy_public_ipv6":
+		if server.PublicNet.IPv6.IP != nil {
+			return func() tea.Msg {
+				if err := clipboard.WriteAll(server.PublicNet.IPv6.IP.String()); err != nil {
+					return message.ErrorMsg{err}
+				}
+				return message.ClipboardCopiedMsg(server.PublicNet.IPv6.IP.String())
+			}
+		}
+		return func() tea.Msg {
+			return message.ErrorMsg{fmt.Errorf("server has no public IPv6")}
+		}
+
 	case "copy_private_ip":
 		if server.PrivateNet[0].IP != nil {
 			return func() tea.Msg {

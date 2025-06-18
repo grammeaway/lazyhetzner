@@ -7,6 +7,8 @@ import (
 	"github.com/hetznercloud/hcloud-go/hcloud"
 	"lazyhetzner/internal/message"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"lazyhetzner/internal/resource"
 	)
 
 type LoadBalancersLoadedMsg struct {
@@ -18,6 +20,9 @@ type LoadBalancersLoadedMsg struct {
 
 type LoadBalancerItem struct {
 	Lb *hcloud.LoadBalancer
+
+	ResourceType resource.ResourceType
+	ResourceID   int
 }
 
 func (i LoadBalancerItem) FilterValue() string { return i.Lb.Name }
