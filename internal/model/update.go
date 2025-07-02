@@ -71,6 +71,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.State = stateTokenInput
 		}
 	case tea.KeyMsg:
+		if key.Matches(msg, keys.Exit) {
+			// Handle exit key - quit the application
+			return m, tea.Quit
+		}
 		// Handle global quit first - only quit the entire app from specific states
 		if key.Matches(msg, keys.Quit) {
 			switch m.State {

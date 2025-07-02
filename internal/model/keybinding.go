@@ -15,6 +15,7 @@ type keyMap struct {
 	Delete key.Binding
 	Add    key.Binding
 	Quit   key.Binding
+	Exit   key.Binding // For completely exiting the application
 	Help   key.Binding
 	Reload key.Binding
 
@@ -80,9 +81,13 @@ var keys = keyMap{
 		key.WithHelp("?", "toggle help"),
 	),
 	Quit: key.NewBinding(
-		key.WithKeys("q", "esc", "ctrl+c"),
+		key.WithKeys("q", "esc"),
 		key.WithHelp("q", "quit"),
 	),
+	Exit: key.NewBinding(
+		key.WithKeys("ctrl+c"),
+		key.WithHelp("ctrl+c", "exit application"),
+		),
 	Reload: key.NewBinding(
 		key.WithKeys("r"),
 		key.WithHelp("r", "reload resources"),
