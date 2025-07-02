@@ -155,7 +155,7 @@ func (m Model) View() string {
 			// Render each service with improved styling
 			for i, service := range m.loadbalancerServices {
 				// Create a styled service description
-				serviceDesc := fmt.Sprintf("Service %d: %s (Protocol: %s, Port: %d)", i+1, service.Protocol, service.Protocol, service.ListenPort)
+				serviceDesc := fmt.Sprintf("Service %d: %s (Protocol: %s, Port: %d -> %d)", i+1, service.Protocol, service.Protocol, service.ListenPort, service.DestinationPort)
 				serviceStyled := serviceStyle.Render(serviceDesc)
 				// Add the service to the content
 				servicesContent.WriteString(serviceStyled + "\n")
@@ -188,7 +188,7 @@ func (m Model) View() string {
 			// Render each target with improved styling
 			for i, target := range m.loadbalancerTargets {
 				// Create a styled target description
-				targetDesc := fmt.Sprintf("Target %d: %s (Type: %s, IP: %s)", i+1, target.Type, target.Type, target.IP)
+				targetDesc := fmt.Sprintf("Target %d: %s (Type: %s, Target count: %d)", i+1, target.LabelSelector.Selector, target.Type, len(target.Targets))
 				targetStyled := targetStyle.Render(targetDesc)
 				// Add the target to the content
 				targetsContent.WriteString(targetStyled + "\n")
