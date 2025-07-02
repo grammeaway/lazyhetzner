@@ -2,10 +2,10 @@ package config
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
 	tea "github.com/charmbracelet/bubbletea"
 	"lazyhetzner/internal/message"
+	"os"
+	"path/filepath"
 )
 
 // Config management
@@ -15,30 +15,29 @@ type ProjectConfig struct {
 }
 
 type Config struct {
-	Projects       []ProjectConfig `json:"projects"`
-	DefaultProject string          `json:"default_project"`
+	Projects        []ProjectConfig `json:"projects"`
+	DefaultProject  string          `json:"default_project"`
+	DefaultTerminal string          `json:"default_terminal"`
 }
-
 
 type ConfigLoadedMsg struct {
-Config *Config
+	Config *Config
 }
-
 
 type ProjectSavedMsg struct{}
 
 func getConfigPath() (string, error) {
-	homeDir, err := os.UserHomeDir()
+	configDir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
 
-	configDir := filepath.Join(homeDir, ".config", "lazyhetzner")
-	if err := os.MkdirAll(configDir, 0700); err != nil {
+	configDirComplete := filepath.Join(configDir, "lazyhetzner")
+	if err := os.MkdirAll(configDirComplete, os.ModePerm); err != nil {
 		return "", err
 	}
 
-	return filepath.Join(configDir, "config.json"), nil
+	return filepath.Join(configDirComplete, "config.json"), nil
 }
 
 func loadConfig() (*Config, error) {
@@ -117,8 +116,6 @@ func (c *Config) RemoveProject(name string) {
 		}
 	}
 }
-
-
 
 func LoadConfigCmd() tea.Cmd {
 	return func() tea.Msg {

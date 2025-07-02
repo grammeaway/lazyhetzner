@@ -40,7 +40,8 @@ To persist and manage multiple projects, you need to create a ```config.json``` 
       "token": "your-staging-token"
     }
   ],
-  "default_project": "production"
+  "default_project": "production",
+  "default_terminal": "" // Optional: specify a default terminal emulator, e.g., "foot", "alacritty", "kitty"
 }
 ```
 

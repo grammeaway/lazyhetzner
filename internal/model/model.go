@@ -97,7 +97,7 @@ func (m *Model) executeContextAction(selectedAction string, resourceType resourc
 			}
 		}
 
-		return ctm_serv.ExecuteServerContextAction(selectedAction, server)
+		return ctm_serv.ExecuteServerContextAction(selectedAction, server, m.config.DefaultTerminal)
 	case resource.ResourceNetworks:
 		network, _, err := m.client.Network.Get(context.Background(), strconv.Itoa(resourceID))
 		if err != nil {

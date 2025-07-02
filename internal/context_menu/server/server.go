@@ -81,7 +81,6 @@ func getServerMenuItems(sessionInfo SessionInfo) []ctm.ContextMenuItem {
 		// ipv6
 		{Label: "📋 Copy Public IPv6", Action: "copy_public_ipv6"}, // Assuming IPv6 is also available
 		{Label: "📋 Copy Private IP", Action: "copy_private_ip"},
-
 	}
 
 	switch sessionInfo.Type {
@@ -110,17 +109,26 @@ func getServerMenuItems(sessionInfo SessionInfo) []ctm.ContextMenuItem {
 }
 
 // launchSSH launches SSH in a new terminal window based on the OS
-func launchSSH(ip string) tea.Cmd {
+func launchSSH(ip string, preferredTerminal string) tea.Cmd {
 	return func() tea.Msg {
 		var cmd *exec.Cmd
 
 		// Determine terminal based on OS
 		switch runtime.GOOS {
 		case "darwin": // macOS
+			if preferredTerminal != "" {
+				// Use preferred terminal if specified
+				cmd = exec.Command(preferredTerminal, "ssh", fmt.Sprintf("root@%s", ip))
+			} else {
 			cmd = exec.Command("osascript", "-e", fmt.Sprintf(`tell application "Terminal" to do script "ssh root@%s"`, ip))
+			}
 		case "linux":
 			// Try common terminal emulators
 			terminals := []string{"gnome-terminal", "konsole", "xterm", "alacritty", "kitty", "foot"}
+			if preferredTerminal != "" {
+				// Put at beginning of the list if specified
+				terminals = append([]string{preferredTerminal}, terminals...)
+			}
 			for _, term := range terminals {
 				if _, err := exec.LookPath(term); err == nil {
 					switch term {
@@ -245,7 +253,7 @@ func CreateServerContextMenu(server *hcloud.Server) ctm.ContextMenu {
 	}
 }
 
-func handleSSHAction(Action string, server *hcloud.Server, sessionInfo SessionInfo) tea.Cmd {
+func handleSSHAction(Action string, server *hcloud.Server, sessionInfo SessionInfo, preferredTerminal string) tea.Cmd {
 	if server.PublicNet.IPv4.IP == nil {
 		return func() tea.Msg {
 			return message.ErrorMsg{fmt.Errorf("server has no public IP")}
@@ -264,7 +272,7 @@ func handleSSHAction(Action string, server *hcloud.Server, sessionInfo SessionIn
 	case "ssh_zellij_pane":
 		return launchSSHInZellijPane(ip)
 	case "ssh_new_terminal":
-		return launchSSH(ip)
+		return launchSSH(ip, preferredTerminal)
 	case "ssh_current_terminal":
 		return launchSSHInSameTerminal(ip)
 	default:
@@ -272,12 +280,12 @@ func handleSSHAction(Action string, server *hcloud.Server, sessionInfo SessionIn
 	}
 }
 
-func ExecuteServerContextAction(selectedAction string, server *hcloud.Server) tea.Cmd {
+func ExecuteServerContextAction(selectedAction string, server *hcloud.Server, preferredTerminal string) tea.Cmd {
 	sessionInfo := detectSession()
 
 	// Handle SSH actions based on the selected action
 	if strings.HasPrefix(selectedAction, "ssh_") {
-		return handleSSHAction(selectedAction, server, sessionInfo)
+		return handleSSHAction(selectedAction, server, sessionInfo, preferredTerminal)
 	}
 
 	// Handle other actions here if needed
