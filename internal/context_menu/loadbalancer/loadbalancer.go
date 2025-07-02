@@ -3,6 +3,7 @@ package loadbalancer
 import (
 	"fmt"
 	ctm "lazyhetzner/internal/context_menu"
+	r_lb "lazyhetzner/internal/resource/loadbalancer"
 	"lazyhetzner/internal/message"
 	"lazyhetzner/internal/resource"
 	"github.com/hetznercloud/hcloud-go/hcloud"
@@ -36,18 +37,15 @@ func getLoadbalancerLabels(loadbalancer *hcloud.LoadBalancer) map[string]string 
 // Returns context menu Items for loadbalancers
 func getLoadbalancerMenuItems() []ctm.ContextMenuItem {
 	return []ctm.ContextMenuItem{
-		// add action for canceling (i.e., closing) the context menu
 		{Label: "❌ Cancel", Action: "cancel"},
 		{Label: "🔖 View Labels", Action: "view_labels"},
-		// Copy the loadbalancer ID to clipboard
 		{Label: "📋 Copy Loadbalancer ID", Action: "copy_id"},
-		// Copy the loadbalancer name to clipboard
 		{Label: "📋 Copy Loadbalancer Name", Action: "copy_name"},
 		{Label: "📋 Copy Public IP (IPv4)", Action: "copy_public_ip"},
-		{ Label: "📋 Copy Public IP (IPv6)", Action: "copy_public_ipv6"}, // Assuming IPv6 is also available
-  		// Copy private IP to clipboard
+		{ Label: "📋 Copy Public IP (IPv6)", Action: "copy_public_ipv6"}, 
 		{Label: "📋 Copy Private IP", Action: "copy_private_ip"},
-
+		{Label: "🔍 View Targets", Action: "view_targets"},
+		{Label: "🔍 View Services", Action: "view_services"},
 
 	}
 }
@@ -133,7 +131,29 @@ func ExecuteLoadbalancerContextAction(selectedAction string, loadbalancer *hclou
 		return func() tea.Msg {
 		return message.ErrorMsg{Err: fmt.Errorf("loadbalancer has no private IP")}
 		}
-
+	case "view_targets":
+		// List targets of the loadbalancer 
+		return func() tea.Msg {
+			targets := loadbalancer.Targets 
+			if len(targets) == 0 {
+				return message.StatusMsg("No targets found for this loadbalancer.")
+			}
+			return r_lb.ViewLoadbalancerTargetsMsg{
+				LoadBalancer: loadbalancer,
+				Targets:      targets,
+			}
+		}
+	case "view_services":
+		return func() tea.Msg {
+			services := loadbalancer.Services
+			if len(services) == 0 {
+				return message.StatusMsg("No services found for this loadbalancer.")
+			}	
+			return r_lb.ViewLoadbalancerServicesMsg{
+			LoadBalancer: loadbalancer,
+			Services:     services,
+			}
+		}
 	default:
 		return nil
 	}

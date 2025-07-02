@@ -139,6 +139,72 @@ func (m Model) View() string {
 			statusView,
 			helpStyle.Render(helpText),
 		)
+        case stateLoadBalancerServiceView:
+		// Render the Load Balancer services, as a list of loadbalancerServices
+		var serviceView strings.Builder
+		serviceView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("Load Balancer Services")))
+		resourceInfo := fmt.Sprintf("🔍 Services for Load Balancer: %s", m.loadbalancerBeingViewed.Name)
+		serviceView.WriteString(infoStyle.Render(resourceInfo) + "\n\n")
+		if len(m.loadbalancerServices) == 0 {
+			noServicesMsg := "⚠️  No services found for this Load Balancer"
+			serviceView.WriteString(noServicesStyle.Render(noServicesMsg) + "\n")
+		} else {
+			// Create a container for all loadbalancerServices
+			var servicesContent strings.Builder
+			servicesContent.WriteString(fmt.Sprintf("Found %d service(s):\n\n", len(m.loadbalancerServices)))
+			// Render each service with improved styling
+			for i, service := range m.loadbalancerServices {
+				// Create a styled service description
+				serviceDesc := fmt.Sprintf("Service %d: %s (Protocol: %s, Port: %d -> %d)", i+1, service.Protocol, service.Protocol, service.ListenPort, service.DestinationPort)
+				serviceStyled := serviceStyle.Render(serviceDesc)
+				// Add the service to the content
+				servicesContent.WriteString(serviceStyled + "\n")
+				// Add spacing between services (except for the last one)
+				if i < len(m.loadbalancerServices)-1 {
+					servicesContent.WriteString("\n")
+				}
+			}
+			// Wrap all services in a container
+			serviceView.WriteString(serviceContainerStyle.Render(servicesContent.String()) + "\n")
+		}
+		// Enhanced help text
+		helpText := "💡 Press 'q' to return to Load Balancer view"
+		serviceView.WriteString("\n" + helpStyle.Render(helpText))
+		return serviceView.String()
+
+	case stateLoadBalancerTargetView:
+		// Render the Load Balancer targets, as a list of loadbalancerTargets
+		var targetView strings.Builder
+		targetView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("Load Balancer Targets")))
+		resourceInfo := fmt.Sprintf("🔍 Targets for Load Balancer: %s", m.loadbalancerBeingViewed.Name)
+		targetView.WriteString(infoStyle.Render(resourceInfo) + "\n\n")
+		if len(m.loadbalancerTargets) == 0 {
+			noTargetsMsg := "⚠️  No targets found for this Load Balancer"
+			targetView.WriteString(noTargetsStyle.Render(noTargetsMsg) + "\n")
+		} else {
+			// Create a container for all loadbalancerTargets
+			var targetsContent strings.Builder
+			targetsContent.WriteString(fmt.Sprintf("Found %d target(s):\n\n", len(m.loadbalancerTargets)))
+			// Render each target with improved styling
+			for i, target := range m.loadbalancerTargets {
+				// Create a styled target description
+				targetDesc := fmt.Sprintf("Target %d: %s (Type: %s, Target count: %d)", i+1, target.LabelSelector.Selector, target.Type, len(target.Targets))
+				targetStyled := targetStyle.Render(targetDesc)
+				// Add the target to the content
+				targetsContent.WriteString(targetStyled + "\n")
+				// Add spacing between targets (except for the last one)
+				if i < len(m.loadbalancerTargets)-1 {
+					targetsContent.WriteString("\n")
+				}
+			}
+			// Wrap all targets in a container
+			targetView.WriteString(targetContainerStyle.Render(targetsContent.String()) + "\n")
+		}
+		// Enhanced help text
+		helpText := "💡 Press 'q' to return to Load Balancer view"
+		targetView.WriteString("\n" + helpStyle.Render(helpText))
+		return targetView.String()
+
 
 	case stateLabelView:
 		// Render the label View
