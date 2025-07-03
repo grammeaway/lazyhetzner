@@ -38,9 +38,9 @@ func (i LoadBalancerItem) Title() string       { return i.Lb.Name }
 func (i LoadBalancerItem) Description() string {
 	status := "🟢 Available"
 	if i.Lb.PublicNet.Enabled {
-		return fmt.Sprintf("%s | %s | Targets: %d", status, i.Lb.PublicNet.IPv4.IP.String(), len(i.Lb.Targets))
+		return fmt.Sprintf("%s | %s | Targets: %d | Services %d", status, i.Lb.PublicNet.IPv4.IP.String(), len(i.Lb.Targets), len(i.Lb.Services))
 	}
-	return fmt.Sprintf("%s | Private only | Targets: %d", status, len(i.Lb.Targets))
+	return fmt.Sprintf("%s | Private only | Targets: %d | Services %d", status, len(i.Lb.Targets), len(i.Lb.Services))
 }
 
 
