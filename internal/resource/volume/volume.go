@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"lazyhetzner/internal/message"
 )
 

@@ -12,7 +12,7 @@ import (
 	ctm_lb "lazyhetzner/internal/context_menu/loadbalancer"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
-	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"lazyhetzner/internal/input_form"
 	"lazyhetzner/internal/message"
 	"lazyhetzner/internal/resource"
@@ -82,10 +82,10 @@ func clearStatusMessage() tea.Cmd {
 }
 
 
-func (m *Model) executeContextAction(selectedAction string, resourceType resource.ResourceType, resourceID int) tea.Cmd {	
+func (m *Model) executeContextAction(selectedAction string, resourceType resource.ResourceType, resourceID int64) tea.Cmd {	
 	switch resourceType {
 	case resource.ResourceServers:
-		server, _, err := m.client.Server.Get(context.Background(), strconv.Itoa(resourceID))
+		server, _, err := m.client.Server.Get(context.Background(), strconv.FormatInt(resourceID, 10))
 		if err != nil {
 			return func() tea.Msg {
 				return message.ErrorMsg{err}
@@ -99,7 +99,7 @@ func (m *Model) executeContextAction(selectedAction string, resourceType resourc
 
 		return ctm_serv.ExecuteServerContextAction(selectedAction, server, m.config.DefaultTerminal)
 	case resource.ResourceNetworks:
-		network, _, err := m.client.Network.Get(context.Background(), strconv.Itoa(resourceID))
+		network, _, err := m.client.Network.Get(context.Background(), strconv.FormatInt(resourceID, 10))
 		if err != nil {
 			return func() tea.Msg {
 				return message.ErrorMsg{err}
@@ -112,7 +112,7 @@ func (m *Model) executeContextAction(selectedAction string, resourceType resourc
 		}
 		return ctm_n.ExecuteNetworkContextAction(selectedAction, network)
 	case resource.ResourceLoadBalancers:
-		loadBalancer, _, err := m.client.LoadBalancer.Get(context.Background(), strconv.Itoa(resourceID))
+		loadBalancer, _, err := m.client.LoadBalancer.Get(context.Background(), strconv.FormatInt(resourceID, 10))
 		if err != nil {
 			return func() tea.Msg {
 				return message.ErrorMsg{err}

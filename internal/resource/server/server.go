@@ -2,7 +2,7 @@ package server
 
 import (
 
-	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"lazyhetzner/internal/message"
 	"context"
 	"fmt"
@@ -21,7 +21,7 @@ type ServersLoadedMsg struct {
 type ServerItem struct {
 	Server *hcloud.Server
 	ResourceType resource.ResourceType
-	ResourceID   int
+	ResourceID   int64
 
 }
 

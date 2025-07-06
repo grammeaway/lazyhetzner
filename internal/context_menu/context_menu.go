@@ -15,5 +15,5 @@ type ContextMenu struct {
 	Items        []ContextMenuItem
 	SelectedItem int
 	ResourceType resource.ResourceType
-	ResourceID   int
+	ResourceID   int64
 }

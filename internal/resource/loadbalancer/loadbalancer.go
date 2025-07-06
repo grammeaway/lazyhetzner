@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"lazyhetzner/internal/message"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -30,7 +30,7 @@ type LoadBalancerItem struct {
 	Lb *hcloud.LoadBalancer
 
 	ResourceType resource.ResourceType
-	ResourceID   int
+	ResourceID   int64
 }
 
 func (i LoadBalancerItem) FilterValue() string { return i.Lb.Name }

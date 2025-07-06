@@ -6,7 +6,7 @@ import (
 	r_lb "lazyhetzner/internal/resource/loadbalancer"
 	"lazyhetzner/internal/message"
 	"lazyhetzner/internal/resource"
-	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/atotto/clipboard"
 	"lazyhetzner/internal/resource/label"

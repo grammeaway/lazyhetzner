@@ -3,7 +3,7 @@ package resource
 
 import ( 
 
-	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	tea "github.com/charmbracelet/bubbletea"
 	"context"
 	"fmt"

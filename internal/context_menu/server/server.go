@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	ctm "lazyhetzner/internal/context_menu"
 	"lazyhetzner/internal/message"
 	"lazyhetzner/internal/resource"

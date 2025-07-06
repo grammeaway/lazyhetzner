@@ -3,7 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/hetznercloud/hcloud-go/hcloud"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"lazyhetzner/internal/message"
 	tea "github.com/charmbracelet/bubbletea"
 	"lazyhetzner/internal/resource"
@@ -19,7 +19,7 @@ type NetworkItem struct {
 	Network *hcloud.Network
 
 	ResourceType resource.ResourceType
-	ResourceID   int
+	ResourceID   int64
 }
 
 func (i NetworkItem) FilterValue() string { return i.Network.Name }
