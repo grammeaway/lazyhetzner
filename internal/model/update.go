@@ -90,8 +90,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Quit
 				}
 			case stateError:
-				// Quit from error state
-				return m, tea.Quit
+				m.State = stateResourceView
+				m.err = nil // Clear error
+				return m, nil
 			case stateLabelView:
 				// From label view, go back to resource view
 				m.State = stateResourceView
