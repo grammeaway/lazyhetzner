@@ -12,8 +12,11 @@ import (
 	"lazyhetzner/internal/resource"
 )
 
-
-
+var (
+	version = "nightly"
+	commit  = "unknown"
+	date    = "unknown"
+)
 
 func initialModel() model.Model {
 	ti := textinput.New()
@@ -35,8 +38,12 @@ func initialModel() model.Model {
 	}
 }
 
-
 func App() {
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Printf("awsbreeze version: %s\ncommit: %s\nbuilt at: %s\n", version, commit, date)
+		return
+	}
+
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error running program: %v", err)

@@ -2,27 +2,33 @@
 A TUI for managing Hetzner Cloud servers with ease. Written in Golang, using Bubble Tea for the terminal user interface, and the hcloud Go client for interacting with the Hetzner Cloud API.
 
 
-## Build from Source
-To build lazyhetzner from source, you need to have Go installed on your system. Follow these steps:
-1. Clone the repository:
-   ```bash
-   git clone foobar/lazyhetzner.git
-    cd lazyhetzner
-    ```
+## Installation
+### Installing with Go on your system
+Clone the repository and run the following commands to install the dependencies and build the binary:
 
-2. Build the project:
-    ```bash
-    go build -o lazyhetzner
-    ```
-3. Make the binary executable:
-    ```bash
-    chmod +x lazyhetzner
-    ```
-4. Move the binary to a directory in your PATH:
-    ```bash
-    sudo mv lazyhetzner /usr/local/bin/
-    ```
+```bash
+go install github.com/lazyhetzner/awsbreeze@latest
+```
+This will install the `awsbreeze` binary in your `$GOPATH/bin` directory. Make sure to add this directory to your `PATH` environment variable if it's not already included.
 
+### Installing with pre-built binaries
+Download the latest release matching your OS from the [releases page](https://github.com/grammeaway/awsbreeze/releases).
+
+Unzip the downloaded file and move the `awsbreeze` binary to a directory in your `PATH`, such as `/usr/local/bin` on Linux or macOS, or `C:\Program Files\` on Windows.
+
+### Installing the nightly build (through Go)
+If you want to try the latest features and bug fixes, you can install the nightly build by running the following command:
+
+```bash
+go install github.com/grammeaway/lazyhetzner@main
+```
+
+## Verifying the installation
+After installing, you can verify that `awsbreeze` is installed correctly by running the following command in your terminal:
+
+```bash
+lazyhetzner version
+```
 
 
 ## Persisting and Managing Multiple Projects
