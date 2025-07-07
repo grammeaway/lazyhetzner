@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	"lazyhetzner/internal/message"
+	"github.com/grammeaway/lazyhetzner/internal/message"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"lazyhetzner/internal/resource"
+	"github.com/grammeaway/lazyhetzner/internal/resource"
 	)
 
 type LoadBalancersLoadedMsg struct {

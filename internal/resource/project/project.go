@@ -3,7 +3,7 @@ package project
 
 import (
 	"fmt"
-	"lazyhetzner/internal/config"
+	"github.com/grammeaway/lazyhetzner/internal/config"
 )
 
 // Project list item

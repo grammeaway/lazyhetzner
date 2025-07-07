@@ -2,14 +2,14 @@ package loadbalancer
 
 import (
 	"fmt"
-	ctm "lazyhetzner/internal/context_menu"
-	r_lb "lazyhetzner/internal/resource/loadbalancer"
-	"lazyhetzner/internal/message"
-	"lazyhetzner/internal/resource"
+	ctm "github.com/grammeaway/lazyhetzner/internal/context_menu"
+	r_lb "github.com/grammeaway/lazyhetzner/internal/resource/loadbalancer"
+	"github.com/grammeaway/lazyhetzner/internal/message"
+	"github.com/grammeaway/lazyhetzner/internal/resource"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/atotto/clipboard"
-	"lazyhetzner/internal/resource/label"
+	"github.com/grammeaway/lazyhetzner/internal/resource/label"
 )
 
 func CreateLoadbalancerContextMenu(loadbalancer *hcloud.LoadBalancer) ctm.ContextMenu {

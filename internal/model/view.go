@@ -3,8 +3,8 @@ package model
 import (
 	"fmt"
 	"github.com/charmbracelet/lipgloss"
-	"lazyhetzner/internal/resource"
-	util "lazyhetzner/utility"
+	"github.com/grammeaway/lazyhetzner/internal/resource"
+	util "github.com/grammeaway/lazyhetzner/utility"
 	"strings"
 )
 
@@ -14,7 +14,7 @@ func (m Model) View() string {
 		if m.config == nil {
 			return fmt.Sprintf(
 				"\n%s\n\n%s\n",
-				titleStyle.Render("lazyhetzner"),
+				titleStyle.Render("github.com/grammeaway/lazyhetzner"),
 				infoStyle.Render("Loading configuration..."),
 			)
 		}
@@ -22,7 +22,7 @@ func (m Model) View() string {
 		if len(m.config.Projects) == 0 {
 			return fmt.Sprintf(
 				"\n%s\n\n%s\n\n%s\n",
-				titleStyle.Render("lazyhetzner"),
+				titleStyle.Render("github.com/grammeaway/lazyhetzner"),
 				warningStyle.Render("No projects configured yet."),
 				helpStyle.Render("Press 'a' to add your first project • Press q to quit"),
 			)
@@ -36,7 +36,7 @@ func (m Model) View() string {
 
 		return fmt.Sprintf(
 			"\n%s\n\n%s%s\n\n%s\n",
-			titleStyle.Render("lazyhetzner"),
+			titleStyle.Render("github.com/grammeaway/lazyhetzner"),
 			m.projectList.View(),
 			statusView,
 			helpStyle.Render("Enter: select project • a: add project • d: delete project • q: quit"),
@@ -66,13 +66,13 @@ func (m Model) View() string {
 
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n",
-			titleStyle.Render("lazyhetzner - Add Project"),
+			titleStyle.Render("github.com/grammeaway/lazyhetzner - Add Project"),
 			formView.String(),
 		)
 	case stateTokenInput:
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n\n%s\n\n%s\n",
-			titleStyle.Render("lazyhetzner"),
+			titleStyle.Render("github.com/grammeaway/lazyhetzner"),
 			infoStyle.Render("Enter API token for one-time access:"),
 			m.TokenInput.View(),
 			helpStyle.Render("Press Enter to continue • Press q to go back"),
@@ -81,7 +81,7 @@ func (m Model) View() string {
 	case stateLoading:
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n",
-			titleStyle.Render("lazyhetzner"),
+			titleStyle.Render("github.com/grammeaway/lazyhetzner"),
 			infoStyle.Render("Loading resources..."),
 		)
 
@@ -321,7 +321,7 @@ func (m Model) View() string {
 	case stateError:
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n\n%s\n",
-			titleStyle.Render("lazyhetzner - Error"),
+			titleStyle.Render("github.com/grammeaway/lazyhetzner - Error"),
 			errorStyle.Render(fmt.Sprintf("Error: %v", m.err)),
 			helpStyle.Render("Press q to quit"),
 		)

@@ -3,11 +3,11 @@ package server
 import (
 
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	"lazyhetzner/internal/message"
+	"github.com/grammeaway/lazyhetzner/internal/message"
 	"context"
 	"fmt"
 	tea "github.com/charmbracelet/bubbletea"
-	"lazyhetzner/internal/resource"
+	"github.com/grammeaway/lazyhetzner/internal/resource"
 
 )
 

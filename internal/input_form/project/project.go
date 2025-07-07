@@ -1,7 +1,7 @@
 package project
 
 import (
-	"lazyhetzner/internal/input_form"
+	"github.com/grammeaway/lazyhetzner/internal/input_form"
 	"github.com/charmbracelet/bubbles/textinput"
 )
 

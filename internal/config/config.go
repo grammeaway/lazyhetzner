@@ -3,7 +3,7 @@ package config
 import (
 	"encoding/json"
 	tea "github.com/charmbracelet/bubbletea"
-	"lazyhetzner/internal/message"
+	"github.com/grammeaway/lazyhetzner/internal/message"
 	"os"
 	"path/filepath"
 )

@@ -1,6 +1,6 @@
 package main 
 
-import "lazyhetzner/cmd"
+import "github.com/grammeaway/lazyhetzner/cmd"
 
 func main() {
 	// Initialize the application

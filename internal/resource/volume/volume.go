@@ -5,7 +5,7 @@ import (
 	"fmt"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	"lazyhetzner/internal/message"
+	"github.com/grammeaway/lazyhetzner/internal/message"
 )
 
 type VolumesLoadedMsg struct {

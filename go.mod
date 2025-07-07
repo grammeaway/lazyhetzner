@@ -1,4 +1,4 @@
-module lazyhetzner
+module github.com/grammeaway/lazyhetzner
 
 go 1.24.4
 

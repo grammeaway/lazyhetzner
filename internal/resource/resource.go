@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"lazyhetzner/internal/message"
+	"github.com/grammeaway/lazyhetzner/internal/message"
 )
 
 type ResourceType int

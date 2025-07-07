@@ -1,7 +1,7 @@
 package label 
 
 import (
-	"lazyhetzner/internal/resource"
+	"github.com/grammeaway/lazyhetzner/internal/resource"
 )
 
 type LabelsLoadedMsg struct {

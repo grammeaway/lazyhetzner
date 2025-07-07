@@ -1,7 +1,7 @@
 package context_menu
 
 import (
-	"lazyhetzner/internal/resource"
+	"github.com/grammeaway/lazyhetzner/internal/resource"
 )
 
 
