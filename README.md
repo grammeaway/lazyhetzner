@@ -7,6 +7,19 @@ For the foreseeable future, this TUI is primarily meant for interacting with exi
 
 The tool is heavily inspired by lovely TUI projects like [lazydocker](https://github.com/jesseduffield/lazydocker) and [lazysql](https://github.com/jorgerojas26/lazysql), both tools that I use on an almost daily basis. I hope this Hetzner TUI will be a worthy entry into the "lazy" family.
 
+Table of Contents:
+- [lazyhetzner](#lazyhetzner)
+  - [Features](#features)
+  - [Installation](#installation)
+    - [Installing with Go on your system](#installing-with-go-on-your-system)
+    - [Installing with pre-built binaries](#installing-with-pre-built-binaries)
+    - [Installing the nightly build (through Go)](#installing-the-nightly-build-through-go)
+  - [Verifying the installation](#verifying-the-installation)
+  - [Persisting and Managing Multiple Projects](#persisting-and-managing-multiple-projects)
+  - [Known Issues](#known-issues)
+  - [Roadmap](#roadmap)
+  - [Contributing](#contributing)
+
 ## Features
 Notable features include:
 - **View resource labels**: View labels for various Hetzner resources.
@@ -64,7 +77,7 @@ To persist and manage multiple projects, you need to create a ```config.json``` 
 ```
 
 ## Known Issues
-Currently, the flow for persisting project configurations in the TUI itself, is quite clunky and unstable. It is highly recommended to manually create the `config.json` file as described above.
+Currently, the flow for persisting project configurations in the TUI itself, is quite clunky and unstable. It also doesn't offer a convenient way of setting your defualt project (it'll just tag on to whatever project you set first). It is highly recommended to manually create the `config.json` file as described above.
 
 ## Roadmap
 - [ ] Improve the project configuration flow in the TUI.
