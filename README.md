@@ -3,7 +3,9 @@ A TUI for managing Hetzner Cloud servers with ease. Written in Golang, using Bub
 
 Built using Golang, and the [Bubble Tea](https://github.com/charmbracelet/bubbletea) framework.
 
-For the foreseeable future, this TUI is primarily meant for ineracting with existing resources within Hetzner Cloud, rather than creating or deleting them. Creation and deletion of resources might be added in the future, but until then, consider using IaC tools like [Terraform](https://www.terraform.io/) for resource management.
+For the foreseeable future, this TUI is primarily meant for interacting with existing resources within Hetzner Cloud, rather than creating or deleting them. Creation and deletion of resources might be added in the future, but until then, consider using IaC tools like [Terraform](https://www.terraform.io/) for resource management.
+
+The tool is heavily inspired by lovely TUI projects like [lazydocker](https://github.com/jesseduffield/lazydocker) and [lazysql](https://github.com/jorgerojas26/lazysql), both tools that I use on an almost daily basis. I hope this Hetzner TUI will be a worthy entry into the "lazy" family.
 
 ## Features
 Notable features include:
