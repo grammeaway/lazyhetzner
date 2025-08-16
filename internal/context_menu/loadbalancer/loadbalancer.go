@@ -44,8 +44,8 @@ func getLoadbalancerMenuItems() []ctm.ContextMenuItem {
 		{Label: "📋 Copy Public IP (IPv4)", Action: "copy_public_ip"},
 		{ Label: "📋 Copy Public IP (IPv6)", Action: "copy_public_ipv6"}, 
 		{Label: "📋 Copy Private IP", Action: "copy_private_ip"},
-		{Label: "🔍 View Targets", Action: "view_targets"},
-		{Label: "🔍 View Services", Action: "view_services"},
+		{Label: "🎯 View Targets", Action: "view_targets"},
+		{Label: "🔌 View Services", Action: "view_services"},
 
 	}
 }

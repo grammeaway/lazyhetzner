@@ -143,7 +143,7 @@ func (m Model) View() string {
 		// Render the Load Balancer services, as a list of loadbalancerServices
 		var serviceView strings.Builder
 		serviceView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("Load Balancer Services")))
-		resourceInfo := fmt.Sprintf("🔍 Services for Load Balancer: %s", m.loadbalancerBeingViewed.Name)
+		resourceInfo := fmt.Sprintf("🔌Services for Load Balancer: %s", m.loadbalancerBeingViewed.Name)
 		serviceView.WriteString(infoStyle.Render(resourceInfo) + "\n\n")
 		if len(m.loadbalancerServices) == 0 {
 			noServicesMsg := "⚠️  No services found for this Load Balancer"
@@ -155,7 +155,7 @@ func (m Model) View() string {
 			// Render each service with improved styling
 			for i, service := range m.loadbalancerServices {
 				// Create a styled service description
-				serviceDesc := fmt.Sprintf("Service %d: %s (Protocol: %s, Port: %d -> %d)", i+1, service.Protocol, service.Protocol, service.ListenPort, service.DestinationPort)
+				serviceDesc := fmt.Sprintf("🔌Service %d: %s (Protocol: %s, Port: %d -> %d)", i+1, service.Protocol, service.Protocol, service.ListenPort, service.DestinationPort)
 				serviceStyled := serviceStyle.Render(serviceDesc)
 				// Add the service to the content
 				servicesContent.WriteString(serviceStyled + "\n")
@@ -176,7 +176,7 @@ func (m Model) View() string {
 		// Render the Load Balancer targets, as a list of loadbalancerTargets
 		var targetView strings.Builder
 		targetView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("Load Balancer Targets")))
-		resourceInfo := fmt.Sprintf("🔍 Targets for Load Balancer: %s", m.loadbalancerBeingViewed.Name)
+		resourceInfo := fmt.Sprintf("🎯Targets for Load Balancer: %s", m.loadbalancerBeingViewed.Name)
 		targetView.WriteString(infoStyle.Render(resourceInfo) + "\n\n")
 		if len(m.loadbalancerTargets) == 0 {
 			noTargetsMsg := "⚠️  No targets found for this Load Balancer"
@@ -188,7 +188,7 @@ func (m Model) View() string {
 			// Render each target with improved styling
 			for i, target := range m.loadbalancerTargets {
 				// Create a styled target description
-				targetDesc := fmt.Sprintf("Target %d: %s (Type: %s, Target count: %d)", i+1, target.LabelSelector.Selector, target.Type, len(target.Targets))
+				targetDesc := fmt.Sprintf("🎯Target %d: %s (Type: %s, Target count: %d)", i+1, target.LabelSelector.Selector, target.Type, len(target.Targets))
 				targetStyled := targetStyle.Render(targetDesc)
 				// Add the target to the content
 				targetsContent.WriteString(targetStyled + "\n")
