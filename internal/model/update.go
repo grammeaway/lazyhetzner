@@ -68,7 +68,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// If no projects, go to token input
 		if len(m.config.Projects) == 0 {
-			m.State = stateTokenInput
+			m.State = StateProjectSelect
 		}
 	case tea.KeyMsg:
 		if key.Matches(msg, keys.Exit) {
