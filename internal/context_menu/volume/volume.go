@@ -38,8 +38,9 @@ func getVolumeMenuItems() []ctm.ContextMenuItem {
 		{Label: "📋 Copy Volume ID", Action: "copy_id"},
 		// Copy the volume name to clipboard
 		{Label: "📋 Copy Volume Name", Action: "copy_name"},
-		// copy CIDR to clipboard
+		// Copy the attached server ID to clipboard 
 		{Label: "📋 Copy Attached Server ID", Action: "copy_server_id"},
+		// Copy the attached server name to clipboard
 		{Label: "📋 Copy Attached Server Name", Action: "copy_server_name"},
 	}
 }
