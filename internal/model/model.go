@@ -10,6 +10,7 @@ import (
 	ctm_serv "github.com/grammeaway/lazyhetzner/internal/context_menu/server"
 	ctm_n "github.com/grammeaway/lazyhetzner/internal/context_menu/network"
 	ctm_lb "github.com/grammeaway/lazyhetzner/internal/context_menu/loadbalancer"
+	ctm_vol "github.com/grammeaway/lazyhetzner/internal/context_menu/volume"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
@@ -124,6 +125,26 @@ func (m *Model) executeContextAction(selectedAction string, resourceType resourc
 			}
 		}
 		return ctm_lb.ExecuteLoadbalancerContextAction(selectedAction, loadBalancer)
+	case resource.ResourceVolumes:
+		volume, _, err := m.client.Volume.Get(context.Background(), strconv.FormatInt(resourceID, 10))
+		if err != nil {
+			return func() tea.Msg {
+				return message.ErrorMsg{err}
+			}
+		}
+		if volume == nil {
+			return func() tea.Msg {
+				return message.ErrorMsg{fmt.Errorf("volume with ID %d not found", resourceID)}
+			}
+		}
+		// unfold server details if attached
+		if volume.Server != nil {
+			server, _, err := m.client.Server.GetByID(context.Background(), volume.Server.ID)
+			if err == nil && server != nil {
+				volume.Server = server
+			}
+		}
+		return ctm_vol.ExecuteVolumeContextAction(selectedAction, volume)
 	}
 
 	return nil
