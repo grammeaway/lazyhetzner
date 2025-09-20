@@ -33,6 +33,16 @@ func LoadVolumes(client *hcloud.Client) tea.Cmd {
 		if err != nil {
 			return message.ErrorMsg{err}
 		}
+
+		// Populate Server name fields for attached servers
+		for _, vol := range volumes {
+			if vol.Server != nil {
+				server, _, err := client.Server.GetByID(ctx, vol.Server.ID)
+				if err == nil && server != nil {
+					vol.Server = server
+				}
+			}
+		}
 		return VolumesLoadedMsg{Volumes: volumes}
 	}
 }

@@ -8,6 +8,7 @@ import (
 	ctm_serv "github.com/grammeaway/lazyhetzner/internal/context_menu/server"
 	ctm_n "github.com/grammeaway/lazyhetzner/internal/context_menu/network"
 	ctm_lb "github.com/grammeaway/lazyhetzner/internal/context_menu/loadbalancer"
+	ctm_vol "github.com/grammeaway/lazyhetzner/internal/context_menu/volume"
 	"github.com/grammeaway/lazyhetzner/internal/input_form/project"
 	"github.com/grammeaway/lazyhetzner/internal/message"
 	tea "github.com/charmbracelet/bubbletea"
@@ -231,6 +232,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							}
 						}
 					}
+				case resource.ResourceVolumes:
+					if currentList, exists := m.Lists[resource.ResourceVolumes]; exists {
+						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
+							if volumeItem, ok := selectedItem.(r_vol.VolumeItem); ok {
+								m.contextMenu = ctm_vol.CreateVolumeContextMenu(volumeItem.Volume)
+								m.State = stateContextMenu
+							}
+						}
+					}
+
+
 }				
 
 			case key.Matches(msg, keys.Tab):
