@@ -485,16 +485,28 @@ func renderServerDetailGrid(sections []string, width int) string {
 	if len(sections) == 0 {
 		return ""
 	}
-	gridWidth := max(40, width-4)
-	columns := 2
-	if gridWidth < 90 {
+	gridWidth := max(30, width-2)
+	minColumnWidth := 32
+	maxColumns := 3
+	gap := 1
+
+	columns := gridWidth / (minColumnWidth + gap)
+	if columns < 1 {
 		columns = 1
 	}
-	columnWidth := gridWidth
-	if columns == 2 {
-		columnWidth = max(30, (gridWidth-2)/2)
+	if columns > maxColumns {
+		columns = maxColumns
 	}
-	cellStyle := lipgloss.NewStyle().Width(columnWidth)
+
+	totalGap := gap * (columns - 1)
+	columnWidth := (gridWidth - totalGap) / columns
+	if columnWidth < minColumnWidth {
+		columns = 1
+		columnWidth = gridWidth
+		totalGap = 0
+	}
+
+	cellStyle := lipgloss.NewStyle().Width(columnWidth).MaxWidth(columnWidth)
 
 	rows := make([]string, 0, (len(sections)+columns-1)/columns)
 	for i := 0; i < len(sections); i += columns {
@@ -510,7 +522,11 @@ func renderServerDetailGrid(sections []string, width int) string {
 		if columns == 1 {
 			rows = append(rows, rowCells[0])
 		} else {
-			rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, rowCells...))
+			row := rowCells[0]
+			for j := 1; j < len(rowCells); j++ {
+				row = lipgloss.JoinHorizontal(lipgloss.Top, row, strings.Repeat(" ", gap), rowCells[j])
+			}
+			rows = append(rows, row)
 		}
 	}
 
