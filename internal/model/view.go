@@ -318,7 +318,7 @@ func (m Model) View() string {
 			labelSection,
 		}
 
-		detailView.WriteString(renderServerDetailGrid(sections, m.width) + "\n\n")
+		detailView.WriteString(renderServerDetailGrid(sections, m.width) + "\n")
 
 		helpText := "💡 Press 'q' to return to resource view"
 		detailView.WriteString(helpStyle.Render(helpText))
@@ -485,22 +485,36 @@ func renderServerDetailGrid(sections []string, width int) string {
 	if len(sections) == 0 {
 		return ""
 	}
-	columnWidth := max(40, (width-6)/2)
+	gridWidth := max(40, width-4)
+	columns := 2
+	if gridWidth < 90 {
+		columns = 1
+	}
+	columnWidth := gridWidth
+	if columns == 2 {
+		columnWidth = max(30, (gridWidth-2)/2)
+	}
 	cellStyle := lipgloss.NewStyle().Width(columnWidth)
 
-	rows := make([]string, 0, (len(sections)+1)/2)
-	for i := 0; i < len(sections); i += 2 {
-		left := cellStyle.Render(sections[i])
-		right := ""
-		if i+1 < len(sections) {
-			right = cellStyle.Render(sections[i+1])
-		} else {
-			right = cellStyle.Render("")
+	rows := make([]string, 0, (len(sections)+columns-1)/columns)
+	for i := 0; i < len(sections); i += columns {
+		rowCells := make([]string, 0, columns)
+		for j := 0; j < columns; j++ {
+			idx := i + j
+			if idx < len(sections) {
+				rowCells = append(rowCells, cellStyle.Render(sections[idx]))
+			} else if columns == 2 {
+				rowCells = append(rowCells, cellStyle.Render(""))
+			}
 		}
-		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, left, right))
+		if columns == 1 {
+			rows = append(rows, rowCells[0])
+		} else {
+			rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, rowCells...))
+		}
 	}
 
-	return strings.Join(rows, "\n\n")
+	return strings.Join(rows, "\n")
 }
 
 func formatIP(ip net.IP) string {
