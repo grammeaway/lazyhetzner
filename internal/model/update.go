@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/grammeaway/lazyhetzner/internal/config"
 	ctm_fw "github.com/grammeaway/lazyhetzner/internal/context_menu/firewall"
+	ctm_fip "github.com/grammeaway/lazyhetzner/internal/context_menu/floatingip"
 	ctm_lb "github.com/grammeaway/lazyhetzner/internal/context_menu/loadbalancer"
 	ctm_n "github.com/grammeaway/lazyhetzner/internal/context_menu/network"
 	ctm_serv "github.com/grammeaway/lazyhetzner/internal/context_menu/server"
@@ -15,6 +16,7 @@ import (
 	"github.com/grammeaway/lazyhetzner/internal/message"
 	"github.com/grammeaway/lazyhetzner/internal/resource"
 	r_fw "github.com/grammeaway/lazyhetzner/internal/resource/firewall"
+	r_fip "github.com/grammeaway/lazyhetzner/internal/resource/floatingip"
 	r_label "github.com/grammeaway/lazyhetzner/internal/resource/label"
 	r_lb "github.com/grammeaway/lazyhetzner/internal/resource/loadbalancer"
 	r_n "github.com/grammeaway/lazyhetzner/internal/resource/network"
@@ -236,6 +238,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							}
 						}
 					}
+				case resource.ResourceFloatingIPs:
+					if currentList, exists := m.Lists[resource.ResourceFloatingIPs]; exists {
+						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
+							if floatingIPItem, ok := selectedItem.(r_fip.FloatingIPItem); ok {
+								m.contextMenu = ctm_fip.CreateFloatingIPContextMenu(floatingIPItem.FloatingIP)
+								m.State = stateContextMenu
+							}
+						}
+					}
 				case resource.ResourceVolumes:
 					if currentList, exists := m.Lists[resource.ResourceVolumes]; exists {
 						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
@@ -424,6 +435,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		firewallsList := list.New(firewallItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		firewallsList.Title = "Firewalls"
 		m.Lists[resource.ResourceFirewalls] = firewallsList
+		return m, nil
+
+	case r_fip.FloatingIPsLoadedMsg:
+		m.IsLoading = false
+		m.LoadedResources[resource.ResourceFloatingIPs] = true
+
+		floatingIPItems := make([]list.Item, len(msg.FloatingIPs))
+		for i, floatingIP := range msg.FloatingIPs {
+			floatingIPItems[i] = r_fip.FloatingIPItem{
+				FloatingIP:   floatingIP,
+				ResourceType: resource.ResourceFloatingIPs,
+				ResourceID:   floatingIP.ID,
+			}
+		}
+
+		floatingIPsList := list.New(floatingIPItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
+		floatingIPsList.Title = "Floating IPs"
+		m.Lists[resource.ResourceFloatingIPs] = floatingIPsList
 		return m, nil
 
 	case r_vol.VolumesLoadedMsg:

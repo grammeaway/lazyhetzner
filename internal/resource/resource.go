@@ -16,6 +16,7 @@ const (
 	ResourceServers ResourceType = iota
 	ResourceNetworks
 	ResourceLoadBalancers
+	ResourceFloatingIPs
 	ResourceFirewalls
 	ResourceVolumes
 )
@@ -28,6 +29,8 @@ func GetResourceNameFromType(rt ResourceType) string {
 		return "Networks"
 	case ResourceLoadBalancers:
 		return "Load Balancers"
+	case ResourceFloatingIPs:
+		return "Floating IPs"
 	case ResourceFirewalls:
 		return "Firewalls"
 	case ResourceVolumes:
@@ -56,6 +59,11 @@ func loadResources(client *hcloud.Client) tea.Cmd {
 			return message.ErrorMsg{err}
 		}
 
+		floatingIPs, err := client.FloatingIP.All(ctx)
+		if err != nil {
+			return message.ErrorMsg{err}
+		}
+
 		firewalls, err := client.Firewall.All(ctx)
 		if err != nil {
 			return message.ErrorMsg{err}
@@ -70,6 +78,7 @@ func loadResources(client *hcloud.Client) tea.Cmd {
 			servers:       servers,
 			networks:      networks,
 			loadBalancers: loadBalancers,
+			floatingIPs:   floatingIPs,
 			firewalls:     firewalls,
 			volumes:       volumes,
 		}
@@ -80,6 +89,7 @@ type resourcesLoadedMsg struct {
 	servers       []*hcloud.Server
 	networks      []*hcloud.Network
 	loadBalancers []*hcloud.LoadBalancer
+	floatingIPs   []*hcloud.FloatingIP
 	firewalls     []*hcloud.Firewall
 	volumes       []*hcloud.Volume
 }
@@ -140,6 +150,16 @@ func getResourceLabels(client *hcloud.Client, resourceType ResourceType, resourc
 				return message.ErrorMsg{fmt.Errorf("firewall with ID %d not found", resourceID)}
 			}
 			labels = firewall.Labels
+
+		case ResourceFloatingIPs:
+			floatingIP, _, err := client.FloatingIP.Get(ctx, strconv.Itoa(resourceID))
+			if err != nil {
+				return message.ErrorMsg{err}
+			}
+			if floatingIP == nil {
+				return message.ErrorMsg{fmt.Errorf("floating IP with ID %d not found", resourceID)}
+			}
+			labels = floatingIP.Labels
 
 		case ResourceVolumes:
 			volume, _, err := client.Volume.Get(ctx, strconv.Itoa(resourceID))
