@@ -87,7 +87,6 @@ Some menu items are pretty ugly (design isn't my strong suit) - these things bot
 - [ ] Improve the project configuration flow in the TUI.
 - [ ] Create SSH keys in the TUI, to be used in the creation of new servers.
 - [ ] Add visualizations for for the resources:
-    - [ ] Firewalls
     - [ ] Floating IPs
 - [ ] Add visualizations for the sub-resources:
     - [ ] Subnets
