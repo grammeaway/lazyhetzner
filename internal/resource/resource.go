@@ -1,15 +1,13 @@
 package resource
 
-
-import ( 
-
-	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	tea "github.com/charmbracelet/bubbletea"
+import (
 	"context"
 	"fmt"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/grammeaway/lazyhetzner/internal/message"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"strconv"
 	"strings"
-	"github.com/grammeaway/lazyhetzner/internal/message"
 )
 
 type ResourceType int
@@ -18,6 +16,7 @@ const (
 	ResourceServers ResourceType = iota
 	ResourceNetworks
 	ResourceLoadBalancers
+	ResourceFirewalls
 	ResourceVolumes
 )
 
@@ -29,13 +28,14 @@ func GetResourceNameFromType(rt ResourceType) string {
 		return "Networks"
 	case ResourceLoadBalancers:
 		return "Load Balancers"
+	case ResourceFirewalls:
+		return "Firewalls"
 	case ResourceVolumes:
 		return "Volumes"
 	default:
 		return "Unknown Resource"
 	}
 }
-
 
 func loadResources(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
@@ -56,6 +56,11 @@ func loadResources(client *hcloud.Client) tea.Cmd {
 			return message.ErrorMsg{err}
 		}
 
+		firewalls, err := client.Firewall.All(ctx)
+		if err != nil {
+			return message.ErrorMsg{err}
+		}
+
 		volumes, err := client.Volume.All(ctx)
 		if err != nil {
 			return message.ErrorMsg{err}
@@ -65,37 +70,29 @@ func loadResources(client *hcloud.Client) tea.Cmd {
 			servers:       servers,
 			networks:      networks,
 			loadBalancers: loadBalancers,
+			firewalls:     firewalls,
 			volumes:       volumes,
 		}
 	}
 }
 
-
-
 type resourcesLoadedMsg struct {
 	servers       []*hcloud.Server
 	networks      []*hcloud.Network
 	loadBalancers []*hcloud.LoadBalancer
+	firewalls     []*hcloud.Firewall
 	volumes       []*hcloud.Volume
 }
-
-
 
 type ResourceLoadStartMsg struct {
 	ResourceType ResourceType
 }
-
-
-
 
 func StartResourceLoad(rt ResourceType) tea.Cmd {
 	return func() tea.Msg {
 		return ResourceLoadStartMsg{ResourceType: rt}
 	}
 }
-
-
-
 
 func getResourceLabels(client *hcloud.Client, resourceType ResourceType, resourceID int) tea.Cmd {
 	return func() tea.Msg {
@@ -133,6 +130,16 @@ func getResourceLabels(client *hcloud.Client, resourceType ResourceType, resourc
 				return message.ErrorMsg{fmt.Errorf("load balancer with ID %d not found", resourceID)}
 			}
 			labels = lb.Labels
+
+		case ResourceFirewalls:
+			firewall, _, err := client.Firewall.GetByID(ctx, int64(resourceID))
+			if err != nil {
+				return message.ErrorMsg{err}
+			}
+			if firewall == nil {
+				return message.ErrorMsg{fmt.Errorf("firewall with ID %d not found", resourceID)}
+			}
+			labels = firewall.Labels
 
 		case ResourceVolumes:
 			volume, _, err := client.Volume.Get(ctx, strconv.Itoa(resourceID))

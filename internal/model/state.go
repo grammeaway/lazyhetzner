@@ -1,4 +1,5 @@
 package model
+
 // App states
 type state int
 
@@ -12,5 +13,6 @@ const (
 	stateContextMenu
 	stateLoadBalancerServiceView
 	stateLoadBalancerTargetView
+	stateFirewallRuleView
 	stateError
 )

@@ -1,61 +1,65 @@
 package model
 
 import (
+	"context"
 	"fmt"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"strconv"
-	"github.com/grammeaway/lazyhetzner/internal/config"
-	ctm "github.com/grammeaway/lazyhetzner/internal/context_menu"
-	ctm_serv "github.com/grammeaway/lazyhetzner/internal/context_menu/server"
-	ctm_n "github.com/grammeaway/lazyhetzner/internal/context_menu/network"
-	ctm_lb "github.com/grammeaway/lazyhetzner/internal/context_menu/loadbalancer"
-	ctm_vol "github.com/grammeaway/lazyhetzner/internal/context_menu/volume"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
-	"github.com/hetznercloud/hcloud-go/v2/hcloud"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/grammeaway/lazyhetzner/internal/config"
+	ctm "github.com/grammeaway/lazyhetzner/internal/context_menu"
+	ctm_fw "github.com/grammeaway/lazyhetzner/internal/context_menu/firewall"
+	ctm_lb "github.com/grammeaway/lazyhetzner/internal/context_menu/loadbalancer"
+	ctm_n "github.com/grammeaway/lazyhetzner/internal/context_menu/network"
+	ctm_serv "github.com/grammeaway/lazyhetzner/internal/context_menu/server"
+	ctm_vol "github.com/grammeaway/lazyhetzner/internal/context_menu/volume"
 	"github.com/grammeaway/lazyhetzner/internal/input_form"
 	"github.com/grammeaway/lazyhetzner/internal/message"
 	"github.com/grammeaway/lazyhetzner/internal/resource"
+	r_fw "github.com/grammeaway/lazyhetzner/internal/resource/firewall"
+	r_lb "github.com/grammeaway/lazyhetzner/internal/resource/loadbalancer"
+	r_n "github.com/grammeaway/lazyhetzner/internal/resource/network"
+	r_prj "github.com/grammeaway/lazyhetzner/internal/resource/project"
 	r_serv "github.com/grammeaway/lazyhetzner/internal/resource/server"
 	r_vol "github.com/grammeaway/lazyhetzner/internal/resource/volume"
-	r_lb "github.com/grammeaway/lazyhetzner/internal/resource/loadbalancer"
-	r_n"github.com/grammeaway/lazyhetzner/internal/resource/network"
-	r_prj "github.com/grammeaway/lazyhetzner/internal/resource/project"
-	"context"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
+	"strconv"
 	"time"
 )
 
 // Main model
 type Model struct {
-	State           state
-	config          *config.Config
-	TokenInput      textinput.Model
-	projectForm     input_form.InputForm
-	projectList     list.Model
-	client          *hcloud.Client
-	currentProject  string
-	activeTab       resource.ResourceType
-	Lists           map[resource.ResourceType]list.Model
-	contextMenu     ctm.ContextMenu
-	Help            help.Model
-	err             error
-	width           int
-	height          int
-	statusMessage   string
-	LoadedResources map[resource.ResourceType]bool
-	loadingResource resource.ResourceType
-	IsLoading       bool
-	loadedLabels map[string]string
+	State                      state
+	config                     *config.Config
+	TokenInput                 textinput.Model
+	projectForm                input_form.InputForm
+	projectList                list.Model
+	client                     *hcloud.Client
+	currentProject             string
+	activeTab                  resource.ResourceType
+	Lists                      map[resource.ResourceType]list.Model
+	contextMenu                ctm.ContextMenu
+	Help                       help.Model
+	err                        error
+	width                      int
+	height                     int
+	statusMessage              string
+	LoadedResources            map[resource.ResourceType]bool
+	loadingResource            resource.ResourceType
+	IsLoading                  bool
+	loadedLabels               map[string]string
 	labelsPertainingToResource string
-	loadbalancerBeingViewed *hcloud.LoadBalancer
-	loadbalancerTargets []hcloud.LoadBalancerTarget
-	loadbalancerServices []hcloud.LoadBalancerService
+	loadbalancerBeingViewed    *hcloud.LoadBalancer
+	loadbalancerTargets        []hcloud.LoadBalancerTarget
+	loadbalancerServices       []hcloud.LoadBalancerService
+	firewallBeingViewed        *hcloud.Firewall
+	firewallRules              []hcloud.FirewallRule
 }
 
 // Resource types for tabs
 
-var resourceTabs = []string{"Servers", "Networks", "Load Balancers", "Volumes"}
+var resourceTabs = []string{"Servers", "Networks", "Load Balancers", "Firewalls", "Volumes"}
 
 func (m *Model) getResourceLoadCmd(rt resource.ResourceType) tea.Cmd {
 	if m.client == nil {
@@ -69,6 +73,8 @@ func (m *Model) getResourceLoadCmd(rt resource.ResourceType) tea.Cmd {
 		return r_n.LoadNetworks(m.client)
 	case resource.ResourceLoadBalancers:
 		return r_lb.LoadLoadBalancers(m.client)
+	case resource.ResourceFirewalls:
+		return r_fw.LoadFirewalls(m.client)
 	case resource.ResourceVolumes:
 		return r_vol.LoadVolumes(m.client)
 	default:
@@ -82,8 +88,7 @@ func clearStatusMessage() tea.Cmd {
 	})
 }
 
-
-func (m *Model) executeContextAction(selectedAction string, resourceType resource.ResourceType, resourceID int64) tea.Cmd {	
+func (m *Model) executeContextAction(selectedAction string, resourceType resource.ResourceType, resourceID int64) tea.Cmd {
 	switch resourceType {
 	case resource.ResourceServers:
 		server, _, err := m.client.Server.Get(context.Background(), strconv.FormatInt(resourceID, 10))
@@ -145,12 +150,23 @@ func (m *Model) executeContextAction(selectedAction string, resourceType resourc
 			}
 		}
 		return ctm_vol.ExecuteVolumeContextAction(selectedAction, volume)
+	case resource.ResourceFirewalls:
+		firewall, _, err := m.client.Firewall.GetByID(context.Background(), resourceID)
+		if err != nil {
+			return func() tea.Msg {
+				return message.ErrorMsg{err}
+			}
+		}
+		if firewall == nil {
+			return func() tea.Msg {
+				return message.ErrorMsg{fmt.Errorf("firewall with ID %d not found", resourceID)}
+			}
+		}
+		return ctm_fw.ExecuteFirewallContextAction(selectedAction, firewall)
 	}
 
 	return nil
 }
-
-
 
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(textinput.Blink, config.LoadConfigCmd())
