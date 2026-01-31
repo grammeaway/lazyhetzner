@@ -1,6 +1,9 @@
 # lazyhetzner
 A TUI for managing Hetzner Cloud servers with ease. Written in Golang, using Bubble Tea for the terminal user interface, and the hcloud Go client for interacting with the Hetzner Cloud API.
 
+![lazyhetzner demo GIF](./docs/lazyhetzner-demo.gif)
+
+
 Built using Golang, and the [Bubble Tea](https://github.com/charmbracelet/bubbletea) framework.
 
 For the foreseeable future, this TUI is primarily meant for interacting with existing resources within Hetzner Cloud, rather than creating or deleting them. Creation and deletion of resources might be added in the future, but until then, consider using IaC tools like [Terraform](https://www.terraform.io/) for resource management.
