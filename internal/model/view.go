@@ -289,7 +289,8 @@ func (m Model) View() string {
 		if server.PlacementGroup != nil {
 			overviewLines = append(overviewLines, fmt.Sprintf("Placement Group: %s", server.PlacementGroup.Name))
 		}
-		overviewSection := renderServerDetailSection("Overview", overviewLines)
+		columns, columnWidth, gap := serverDetailGridLayout(m.width)
+		overviewSection := renderServerDetailSection("Overview", overviewLines, columnWidth)
 
 		networkLines := []string{
 			fmt.Sprintf("Public IPv4: %s", formatIP(server.PublicNet.IPv4.IP)),
@@ -301,12 +302,12 @@ func (m Model) View() string {
 			networkLines = append(networkLines, "Private Networks:")
 			networkLines = append(networkLines, privateNetLines...)
 		}
-		networkSection := renderServerDetailSection("Networking", networkLines)
-		subnetSection := renderServerDetailSection("Subnets", formatServerSubnets(m.serverDetailNetworks))
-		firewallSection := renderServerDetailSection("Firewalls", formatServerFirewalls(server))
-		loadBalancerSection := renderServerDetailSection("Load Balancers", formatServerLoadBalancers(server))
-		volumeSection := renderServerDetailSection("Volumes", formatServerVolumes(server))
-		labelSection := renderServerDetailSection("Labels", formatServerLabels(server))
+		networkSection := renderServerDetailSection("Networking", networkLines, columnWidth)
+		subnetSection := renderServerDetailSection("Subnets", formatServerSubnets(m.serverDetailNetworks), columnWidth)
+		firewallSection := renderServerDetailSection("Firewalls", formatServerFirewalls(server), columnWidth)
+		loadBalancerSection := renderServerDetailSection("Load Balancers", formatServerLoadBalancers(server), columnWidth)
+		volumeSection := renderServerDetailSection("Volumes", formatServerVolumes(server), columnWidth)
+		labelSection := renderServerDetailSection("Labels", formatServerLabels(server), columnWidth)
 
 		sections := []string{
 			overviewSection,
@@ -318,7 +319,7 @@ func (m Model) View() string {
 			labelSection,
 		}
 
-		detailView.WriteString(renderServerDetailGrid(sections, m.width) + "\n")
+		detailView.WriteString(renderServerDetailGrid(sections, columns, gap) + "\n")
 
 		helpText := "💡 Press 'q' to return to resource view"
 		detailView.WriteString(helpStyle.Render(helpText))
@@ -473,21 +474,19 @@ func formatSubnetGateway(gateway net.IP) string {
 	return gateway.String()
 }
 
-func renderServerDetailSection(title string, lines []string) string {
+func renderServerDetailSection(title string, lines []string, width int) string {
 	if len(lines) == 0 {
 		lines = []string{"No data available."}
 	}
 	content := strings.Join(lines, "\n")
-	return serverDetailSectionStyle.Render(serverDetailTitleStyle.Render(title) + "\n" + content)
+	sectionStyle := serverDetailSectionStyle.Width(width).MaxWidth(width)
+	return sectionStyle.Render(serverDetailTitleStyle.Render(title) + "\n" + content)
 }
 
-func renderServerDetailGrid(sections []string, width int) string {
-	if len(sections) == 0 {
-		return ""
-	}
-	gridWidth := max(30, width-2)
-	minColumnWidth := 32
-	maxColumns := 3
+func serverDetailGridLayout(width int) (int, int, int) {
+	gridWidth := max(30, width-4)
+	minColumnWidth := 36
+	maxColumns := 2
 	gap := 1
 
 	columns := gridWidth / (minColumnWidth + gap)
@@ -503,10 +502,15 @@ func renderServerDetailGrid(sections []string, width int) string {
 	if columnWidth < minColumnWidth {
 		columns = 1
 		columnWidth = gridWidth
-		totalGap = 0
 	}
 
-	cellStyle := lipgloss.NewStyle().Width(columnWidth).MaxWidth(columnWidth)
+	return columns, columnWidth, gap
+}
+
+func renderServerDetailGrid(sections []string, columns int, gap int) string {
+	if len(sections) == 0 {
+		return ""
+	}
 
 	rows := make([]string, 0, (len(sections)+columns-1)/columns)
 	for i := 0; i < len(sections); i += columns {
@@ -514,9 +518,9 @@ func renderServerDetailGrid(sections []string, width int) string {
 		for j := 0; j < columns; j++ {
 			idx := i + j
 			if idx < len(sections) {
-				rowCells = append(rowCells, cellStyle.Render(sections[idx]))
+				rowCells = append(rowCells, sections[idx])
 			} else if columns == 2 {
-				rowCells = append(rowCells, cellStyle.Render(""))
+				rowCells = append(rowCells, "")
 			}
 		}
 		if columns == 1 {
