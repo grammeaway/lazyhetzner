@@ -59,7 +59,7 @@ lazyhetzner version
 ## Persisting and Managing Multiple Projects
 To persist and manage multiple projects, you need to create a ```config.json``` in the ```~/.config/lazyhetzner/``` directory. This file should contain a JSON object with the following structure:
 
-```json
+```jsonc
 {
   "projects": [
     {
