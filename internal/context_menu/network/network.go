@@ -1,14 +1,15 @@
-package network 
+package network
 
 import (
 	"fmt"
+	"github.com/atotto/clipboard"
+	tea "github.com/charmbracelet/bubbletea"
 	ctm "github.com/grammeaway/lazyhetzner/internal/context_menu"
 	"github.com/grammeaway/lazyhetzner/internal/message"
 	"github.com/grammeaway/lazyhetzner/internal/resource"
-	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/atotto/clipboard"
 	"github.com/grammeaway/lazyhetzner/internal/resource/label"
+	r_n "github.com/grammeaway/lazyhetzner/internal/resource/network"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 )
 
 func CreateNetworkContextMenu(network *hcloud.Network) ctm.ContextMenu {
@@ -20,9 +21,6 @@ func CreateNetworkContextMenu(network *hcloud.Network) ctm.ContextMenu {
 	}
 }
 
-
-
-
 func getNetworkLabels(network *hcloud.Network) map[string]string {
 	labels := make(map[string]string)
 	for key, value := range network.Labels {
@@ -31,13 +29,12 @@ func getNetworkLabels(network *hcloud.Network) map[string]string {
 	return labels
 }
 
-
-
 // Returns context menu Items for networks
 func getNetworkMenuItems() []ctm.ContextMenuItem {
 	return []ctm.ContextMenuItem{
 		// add action for canceling (i.e., closing) the context menu
 		{Label: "❌ Cancel", Action: "cancel"},
+		{Label: "🧩 View Subnets", Action: "view_subnets"},
 		{Label: "🔖 View Labels", Action: "view_labels"},
 		// Copy the network ID to clipboard
 		{Label: "📋 Copy Network ID", Action: "copy_id"},
@@ -48,13 +45,23 @@ func getNetworkMenuItems() []ctm.ContextMenuItem {
 	}
 }
 
-
-
 func ExecuteNetworkContextAction(selectedAction string, network *hcloud.Network) tea.Cmd {
 	switch selectedAction {
 	case "cancel":
 		return func() tea.Msg {
 			return message.CancelCtxMenuMsg{}
+		}
+	case "view_subnets":
+		if len(network.Subnets) == 0 {
+			return func() tea.Msg {
+				return message.StatusMsg("No subnets found for this network.")
+			}
+		}
+		return func() tea.Msg {
+			return r_n.ViewNetworkSubnetsMsg{
+				Network: network,
+				Subnets: network.Subnets,
+			}
 		}
 	case "view_labels":
 		labels := getNetworkLabels(network)

@@ -14,5 +14,6 @@ const (
 	stateLoadBalancerServiceView
 	stateLoadBalancerTargetView
 	stateFirewallRuleView
+	stateNetworkSubnetView
 	stateError
 )

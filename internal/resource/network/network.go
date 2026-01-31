@@ -3,17 +3,20 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	"github.com/grammeaway/lazyhetzner/internal/message"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/grammeaway/lazyhetzner/internal/message"
 	"github.com/grammeaway/lazyhetzner/internal/resource"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 )
 
 type NetworksLoadedMsg struct {
 	Networks []*hcloud.Network
 }
 
-
+type ViewNetworkSubnetsMsg struct {
+	Network *hcloud.Network
+	Subnets []hcloud.NetworkSubnet
+}
 
 type NetworkItem struct {
 	Network *hcloud.Network
@@ -27,7 +30,6 @@ func (i NetworkItem) Title() string       { return i.Network.Name }
 func (i NetworkItem) Description() string {
 	return fmt.Sprintf("IP Range: %s | Subnets: %d", i.Network.IPRange.String(), len(i.Network.Subnets))
 }
-
 
 func LoadNetworks(client *hcloud.Client) tea.Cmd {
 	return func() tea.Msg {
