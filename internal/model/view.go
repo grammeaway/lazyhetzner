@@ -479,8 +479,12 @@ func renderServerDetailSection(title string, lines []string, width int) string {
 		lines = []string{"No data available."}
 	}
 	content := strings.Join(lines, "\n")
+	innerWidth := max(10, width-2)
+	innerStyle := lipgloss.NewStyle().Width(innerWidth).MaxWidth(innerWidth)
+	titleLine := innerStyle.Render(serverDetailTitleStyle.Render(title))
+	contentBlock := innerStyle.Render(content)
 	sectionStyle := serverDetailSectionStyle.Width(width).MaxWidth(width)
-	return sectionStyle.Render(serverDetailTitleStyle.Render(title) + "\n" + content)
+	return sectionStyle.Render(lipgloss.JoinVertical(lipgloss.Left, titleLine, contentBlock))
 }
 
 func serverDetailGridLayout(width int) (int, int, int) {
