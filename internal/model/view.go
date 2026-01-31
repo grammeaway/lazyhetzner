@@ -5,7 +5,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/grammeaway/lazyhetzner/internal/resource"
 	util "github.com/grammeaway/lazyhetzner/utility"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
+	"github.com/mattn/go-runewidth"
 	"net"
+	"sort"
 	"strings"
 )
 
@@ -129,7 +132,7 @@ func (m Model) View() string {
 
 		helpText := "Tab: switch view • ←/→: navigate tabs • Enter: actions • r: reload resources • q: back to projects"
 		if m.activeTab == resource.ResourceServers {
-			helpText = "Tab: switch view • ←/→: navigate tabs • Enter: server actions • r: reload resources • q: back to projects"
+			helpText = "Tab: switch view • ←/→: navigate tabs • Enter: server actions • i: view details • r: reload resources • q: back to projects"
 		}
 
 		return fmt.Sprintf(
@@ -259,6 +262,69 @@ func (m Model) View() string {
 		helpText := "💡 Press 'q' to return to Network view"
 		subnetView.WriteString("\n" + helpStyle.Render(helpText))
 		return subnetView.String()
+
+	case stateServerDetailView:
+		if m.serverBeingViewed == nil {
+			return fmt.Sprintf(
+				"\n%s\n\n%s\n\n%s\n",
+				titleStyle.Render("Server Details"),
+				warningStyle.Render("No server details available."),
+				helpStyle.Render("Press 'q' to return to resource view"),
+			)
+		}
+
+		server := m.serverBeingViewed
+		var detailView strings.Builder
+		detailView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("Server Details")))
+		header := fmt.Sprintf("🖥️ Server: %s (ID: %d)", server.Name, server.ID)
+		detailView.WriteString(infoStyle.Render(header) + "\n\n")
+
+		overviewLines := []string{
+			fmt.Sprintf("Status: %s", server.Status),
+			fmt.Sprintf("Type: %s", formatServerType(server)),
+			fmt.Sprintf("Datacenter: %s", formatDatacenter(server)),
+			fmt.Sprintf("Image: %s", formatServerImage(server)),
+			fmt.Sprintf("Created: %s", server.Created.Format("2006-01-02 15:04:05")),
+			fmt.Sprintf("Rescue Enabled: %t", server.RescueEnabled),
+		}
+		if server.PlacementGroup != nil {
+			overviewLines = append(overviewLines, fmt.Sprintf("Placement Group: %s", server.PlacementGroup.Name))
+		}
+		columns, columnWidth, gap := serverDetailGridLayout(m.width)
+		overviewSection := renderServerDetailSection("Overview", overviewLines, columnWidth)
+
+		networkLines := []string{
+			fmt.Sprintf("Public IPv4: %s", formatIP(server.PublicNet.IPv4.IP)),
+			fmt.Sprintf("Public IPv6: %s", formatIP(server.PublicNet.IPv6.IP)),
+			fmt.Sprintf("Floating IPs: %s", formatFloatingIPs(server.PublicNet.FloatingIPs)),
+		}
+		privateNetLines := formatPrivateNetworks(server)
+		if len(privateNetLines) > 0 {
+			networkLines = append(networkLines, "Private Networks:")
+			networkLines = append(networkLines, privateNetLines...)
+		}
+		networkSection := renderServerDetailSection("Networking", networkLines, columnWidth)
+		subnetSection := renderServerDetailSection("Subnets", formatServerSubnets(m.serverDetailNetworks), columnWidth)
+		firewallSection := renderServerDetailSection("Firewalls", formatServerFirewalls(server), columnWidth)
+		loadBalancerSection := renderServerDetailSection("Load Balancers", formatServerLoadBalancers(server), columnWidth)
+		volumeSection := renderServerDetailSection("Volumes", formatServerVolumes(server), columnWidth)
+		labelSection := renderServerDetailSection("Labels", formatServerLabels(server), columnWidth)
+
+		sections := []string{
+			overviewSection,
+			networkSection,
+			subnetSection,
+			firewallSection,
+			loadBalancerSection,
+			volumeSection,
+			labelSection,
+		}
+
+		detailView.WriteString(renderServerDetailGrid(sections, columns, gap) + "\n")
+
+		helpText := "💡 Press 'q' to return to resource view"
+		detailView.WriteString(helpStyle.Render(helpText))
+		return detailView.String()
 
 	case stateLabelView:
 		// Render the label View
@@ -407,4 +473,270 @@ func formatSubnetGateway(gateway net.IP) string {
 		return "n/a"
 	}
 	return gateway.String()
+}
+
+func renderServerDetailSection(title string, lines []string, width int) string {
+	if len(lines) == 0 {
+		lines = []string{"No data available."}
+	}
+	content := strings.Join(lines, "\n")
+	
+	// Account for padding (0,1) = 2 horizontal padding + border (2) = 4 total
+	innerWidth := max(10, width-4)
+	
+	innerStyle := lipgloss.NewStyle().Width(innerWidth).MaxWidth(innerWidth)
+	titleLine := innerStyle.Render(serverDetailTitleStyle.Render(wrapText(title, innerWidth)))
+	contentBlock := innerStyle.Render(wrapText(content, innerWidth))
+	
+	return serverDetailSectionStyle.Render(lipgloss.JoinVertical(lipgloss.Left, titleLine, contentBlock))
+}
+func serverDetailGridLayout(width int) (int, int, int) {
+	gridWidth := max(30, width-4)
+	minColumnWidth := 36
+	maxColumns := 2
+	gap := 1
+
+	columns := gridWidth / (minColumnWidth + gap)
+	if columns < 1 {
+		columns = 1
+	}
+	if columns > maxColumns {
+		columns = maxColumns
+	}
+
+	totalGap := gap * (columns - 1)
+	columnWidth := (gridWidth - totalGap) / columns
+	if columnWidth < minColumnWidth {
+		columns = 1
+		columnWidth = gridWidth
+	}
+
+	return columns, columnWidth, gap
+}
+
+func renderServerDetailGrid(sections []string, columns int, gap int) string {
+	if len(sections) == 0 {
+		return ""
+	}
+
+	rows := make([]string, 0, (len(sections)+columns-1)/columns)
+	for i := 0; i < len(sections); i += columns {
+		rowCells := make([]string, 0, columns)
+		for j := 0; j < columns; j++ {
+			idx := i + j
+			if idx < len(sections) {
+				rowCells = append(rowCells, sections[idx])
+			} else if columns == 2 {
+				rowCells = append(rowCells, "")
+			}
+		}
+		if columns == 1 {
+			rows = append(rows, rowCells[0])
+		} else {
+			row := rowCells[0]
+			for j := 1; j < len(rowCells); j++ {
+				row = lipgloss.JoinHorizontal(lipgloss.Top, row, strings.Repeat(" ", gap), rowCells[j])
+			}
+			rows = append(rows, row)
+		}
+	}
+
+	return strings.Join(rows, "\n")
+}
+
+func formatIP(ip net.IP) string {
+	if ip == nil || len(ip) == 0 {
+		return "n/a"
+	}
+	return ip.String()
+}
+
+func wrapText(text string, width int) string {
+	if width <= 0 || text == "" {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+	wrapped := make([]string, 0, len(lines))
+	for _, line := range lines {
+		wrapped = append(wrapped, wrapLine(line, width)...)
+	}
+	return strings.Join(wrapped, "\n")
+}
+
+func wrapLine(line string, width int) []string {
+	if width <= 0 {
+		return []string{line}
+	}
+	if runewidth.StringWidth(line) <= width {
+		return []string{line}
+	}
+	var (
+		lines []string
+		buf   strings.Builder
+		count int
+	)
+	for _, r := range line {
+		rw := runewidth.RuneWidth(r)
+		if count+rw > width {
+			lines = append(lines, buf.String())
+			buf.Reset()
+			count = 0
+		}
+		buf.WriteRune(r)
+		count += rw
+	}
+	if buf.Len() > 0 {
+		lines = append(lines, buf.String())
+	}
+	return lines
+}
+
+func formatServerType(server *hcloud.Server) string {
+	if server.ServerType == nil {
+		return "n/a"
+	}
+	return server.ServerType.Name
+}
+
+func formatDatacenter(server *hcloud.Server) string {
+	if server.Datacenter == nil {
+		return "n/a"
+	}
+	return server.Datacenter.Name
+}
+
+func formatServerImage(server *hcloud.Server) string {
+	if server.Image == nil {
+		return "n/a"
+	}
+	if server.Image.Name != "" {
+		return server.Image.Name
+	}
+	return fmt.Sprintf("Image %d", server.Image.ID)
+}
+
+func formatFloatingIPs(floatingIPs []*hcloud.FloatingIP) string {
+	if len(floatingIPs) == 0 {
+		return "none"
+	}
+	parts := make([]string, 0, len(floatingIPs))
+	for _, floatingIP := range floatingIPs {
+		if floatingIP == nil {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s (ID: %d)", floatingIP.IP, floatingIP.ID))
+	}
+	if len(parts) == 0 {
+		return "none"
+	}
+	return strings.Join(parts, ", ")
+}
+
+func formatPrivateNetworks(server *hcloud.Server) []string {
+	if server == nil || len(server.PrivateNet) == 0 {
+		return []string{"No private networks attached."}
+	}
+	lines := make([]string, 0, len(server.PrivateNet))
+	for _, privateNet := range server.PrivateNet {
+		networkName := "unknown"
+		networkID := int64(0)
+		if privateNet.Network != nil {
+			networkName = privateNet.Network.Name
+			networkID = privateNet.Network.ID
+		}
+		aliasText := "none"
+		if len(privateNet.Aliases) > 0 {
+			aliases := make([]string, 0, len(privateNet.Aliases))
+			for _, alias := range privateNet.Aliases {
+				if alias != nil {
+					aliases = append(aliases, alias.String())
+				}
+			}
+			if len(aliases) > 0 {
+				aliasText = strings.Join(aliases, ", ")
+			}
+		}
+		lines = append(lines, fmt.Sprintf("• %s (ID: %d) | IP: %s | MAC: %s | Aliases: %s", networkName, networkID, formatIP(privateNet.IP), privateNet.MACAddress, aliasText))
+	}
+	return lines
+}
+
+func formatServerSubnets(networks []*hcloud.Network) []string {
+	if len(networks) == 0 {
+		return []string{"No subnets available."}
+	}
+	lines := []string{}
+	for _, network := range networks {
+		if network == nil {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s (ID: %d)", network.Name, network.ID))
+		if len(network.Subnets) == 0 {
+			lines = append(lines, "  • No subnets defined.")
+			continue
+		}
+		for _, subnet := range network.Subnets {
+			ipRange := "n/a"
+			if subnet.IPRange != nil {
+				ipRange = subnet.IPRange.String()
+			}
+			lines = append(lines, fmt.Sprintf("  • %s (%s) | Zone: %s | Gateway: %s", ipRange, strings.ToUpper(string(subnet.Type)), subnet.NetworkZone, formatSubnetGateway(subnet.Gateway)))
+		}
+	}
+	return lines
+}
+
+func formatServerFirewalls(server *hcloud.Server) []string {
+	if server == nil || len(server.PublicNet.Firewalls) == 0 {
+		return []string{"No firewalls attached."}
+	}
+	lines := make([]string, 0, len(server.PublicNet.Firewalls))
+	for _, firewallStatus := range server.PublicNet.Firewalls {
+		lines = append(lines, fmt.Sprintf("• %s (ID: %d) | Status: %s", firewallStatus.Firewall.Name, firewallStatus.Firewall.ID, firewallStatus.Status))
+	}
+	return lines
+}
+
+func formatServerLoadBalancers(server *hcloud.Server) []string {
+	if server == nil || len(server.LoadBalancers) == 0 {
+		return []string{"No load balancers attached."}
+	}
+	lines := make([]string, 0, len(server.LoadBalancers))
+	for _, lb := range server.LoadBalancers {
+		if lb == nil {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("• %s (ID: %d)", lb.Name, lb.ID))
+	}
+	return lines
+}
+
+func formatServerVolumes(server *hcloud.Server) []string {
+	if server == nil || len(server.Volumes) == 0 {
+		return []string{"No volumes attached."}
+	}
+	lines := make([]string, 0, len(server.Volumes))
+	for _, volume := range server.Volumes {
+		if volume == nil {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("• %s (ID: %d) | Size: %d GB", volume.Name, volume.ID, volume.Size))
+	}
+	return lines
+}
+
+func formatServerLabels(server *hcloud.Server) []string {
+	if server == nil || len(server.Labels) == 0 {
+		return []string{"No labels attached."}
+	}
+	keys := make([]string, 0, len(server.Labels))
+	for key := range server.Labels {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	lines := make([]string, 0, len(keys))
+	for _, key := range keys {
+		lines = append(lines, fmt.Sprintf("• %s=%s", key, server.Labels[key]))
+	}
+	return lines
 }

@@ -59,6 +59,8 @@ type Model struct {
 	firewallRules              []hcloud.FirewallRule
 	networkBeingViewed         *hcloud.Network
 	networkSubnets             []hcloud.NetworkSubnet
+	serverBeingViewed          *hcloud.Server
+	serverDetailNetworks       []*hcloud.Network
 }
 
 // Resource types for tabs
@@ -97,6 +99,9 @@ func clearStatusMessage() tea.Cmd {
 func (m *Model) executeContextAction(selectedAction string, resourceType resource.ResourceType, resourceID int64) tea.Cmd {
 	switch resourceType {
 	case resource.ResourceServers:
+		if selectedAction == "view_details" {
+			return r_serv.LoadServerDetails(m.client, resourceID)
+		}
 		server, _, err := m.client.Server.Get(context.Background(), strconv.FormatInt(resourceID, 10))
 		if err != nil {
 			return func() tea.Msg {

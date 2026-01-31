@@ -6,18 +6,19 @@ import (
 
 // Key bindings
 type keyMap struct {
-	Up     key.Binding
-	Down   key.Binding
-	Left   key.Binding
-	Right  key.Binding
-	Tab    key.Binding
-	Enter  key.Binding
-	Delete key.Binding
-	Add    key.Binding
-	Quit   key.Binding
-	Exit   key.Binding // For completely exiting the application
-	Help   key.Binding
-	Reload key.Binding
+	Up      key.Binding
+	Down    key.Binding
+	Left    key.Binding
+	Right   key.Binding
+	Tab     key.Binding
+	Enter   key.Binding
+	Delete  key.Binding
+	Add     key.Binding
+	Quit    key.Binding
+	Exit    key.Binding // For completely exiting the application
+	Help    key.Binding
+	Reload  key.Binding
+	Details key.Binding
 
 	Num1 key.Binding
 	Num2 key.Binding
@@ -38,7 +39,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Left, k.Right},
-		{k.Tab, k.Enter, k.Add, k.Delete},
+		{k.Tab, k.Enter, k.Add, k.Delete, k.Details},
 		{k.Help, k.Quit},
 	}
 }
@@ -87,10 +88,14 @@ var keys = keyMap{
 	Exit: key.NewBinding(
 		key.WithKeys("ctrl+c"),
 		key.WithHelp("ctrl+c", "exit application"),
-		),
+	),
 	Reload: key.NewBinding(
 		key.WithKeys("r"),
 		key.WithHelp("r", "reload resources"),
+	),
+	Details: key.NewBinding(
+		key.WithKeys("i"),
+		key.WithHelp("i", "server details"),
 	),
 
 	Num1: key.NewBinding(key.WithKeys("1")),
@@ -104,4 +109,3 @@ var keys = keyMap{
 	Num9: key.NewBinding(key.WithKeys("9")),
 	Num0: key.NewBinding(key.WithKeys("0")),
 }
-

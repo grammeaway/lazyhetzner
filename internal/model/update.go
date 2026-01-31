@@ -127,6 +127,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case stateNetworkSubnetView:
 				m.State = stateResourceView
 				return m, nil
+			case stateServerDetailView:
+				m.State = stateResourceView
+				return m, nil
 
 			}
 		}
@@ -269,6 +272,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					}
 				}
+			case key.Matches(msg, keys.Details):
+				if m.activeTab == resource.ResourceServers {
+					if currentList, exists := m.Lists[resource.ResourceServers]; exists {
+						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
+							if serverItem, ok := selectedItem.(r_serv.ServerItem); ok {
+								return m, r_serv.LoadServerDetails(m.client, serverItem.Server.ID)
+							}
+						}
+					}
+				}
 
 			case key.Matches(msg, keys.Tab):
 				m.activeTab = (m.activeTab + 1) % resource.ResourceType(len(resourceTabs))
@@ -382,6 +395,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		serversList := list.New(serverItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		serversList.Title = "Servers"
 		m.Lists[resource.ResourceServers] = serversList
+		return m, nil
+	case r_serv.ServerDetailsLoadedMsg:
+		m.IsLoading = false
+		m.serverBeingViewed = msg.Server
+		m.serverDetailNetworks = msg.Networks
+		m.State = stateServerDetailView
 		return m, nil
 
 	case r_n.NetworksLoadedMsg:

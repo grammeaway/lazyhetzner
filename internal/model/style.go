@@ -152,4 +152,13 @@ var (
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("#444444")).
 				Background(lipgloss.Color("#0f0f0f"))
+	serverDetailSectionStyle = lipgloss.NewStyle().
+					Margin(0, 0, 1, 0).
+					Padding(0,1).
+					Border(lipgloss.RoundedBorder()).
+					BorderForeground(lipgloss.Color("#3b82f6")).
+					Background(lipgloss.Color("#0b1a2b"))
+	serverDetailTitleStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#93c5fd")).
+				Bold(true)
 )
