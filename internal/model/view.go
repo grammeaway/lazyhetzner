@@ -5,7 +5,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/grammeaway/lazyhetzner/internal/resource"
 	util "github.com/grammeaway/lazyhetzner/utility"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"net"
+	"sort"
 	"strings"
 )
 
@@ -129,7 +131,7 @@ func (m Model) View() string {
 
 		helpText := "Tab: switch view • ←/→: navigate tabs • Enter: actions • r: reload resources • q: back to projects"
 		if m.activeTab == resource.ResourceServers {
-			helpText = "Tab: switch view • ←/→: navigate tabs • Enter: server actions • r: reload resources • q: back to projects"
+			helpText = "Tab: switch view • ←/→: navigate tabs • Enter: server actions • i: view details • r: reload resources • q: back to projects"
 		}
 
 		return fmt.Sprintf(
@@ -259,6 +261,66 @@ func (m Model) View() string {
 		helpText := "💡 Press 'q' to return to Network view"
 		subnetView.WriteString("\n" + helpStyle.Render(helpText))
 		return subnetView.String()
+
+	case stateServerDetailView:
+		if m.serverBeingViewed == nil {
+			return fmt.Sprintf(
+				"\n%s\n\n%s\n\n%s\n",
+				titleStyle.Render("Server Details"),
+				warningStyle.Render("No server details available."),
+				helpStyle.Render("Press 'q' to return to resource view"),
+			)
+		}
+
+		server := m.serverBeingViewed
+		var detailView strings.Builder
+		detailView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("Server Details")))
+		header := fmt.Sprintf("🖥️ Server: %s (ID: %d)", server.Name, server.ID)
+		detailView.WriteString(infoStyle.Render(header) + "\n\n")
+
+		overviewLines := []string{
+			fmt.Sprintf("Status: %s", server.Status),
+			fmt.Sprintf("Type: %s", formatServerType(server)),
+			fmt.Sprintf("Datacenter: %s", formatDatacenter(server)),
+			fmt.Sprintf("Image: %s", formatServerImage(server)),
+			fmt.Sprintf("Created: %s", server.Created.Format("2006-01-02 15:04:05")),
+			fmt.Sprintf("Rescue Enabled: %t", server.RescueEnabled),
+		}
+		if server.PlacementGroup != nil {
+			overviewLines = append(overviewLines, fmt.Sprintf("Placement Group: %s", server.PlacementGroup.Name))
+		}
+		detailView.WriteString(renderServerDetailSection("Overview", overviewLines) + "\n\n")
+
+		networkLines := []string{
+			fmt.Sprintf("Public IPv4: %s", formatIP(server.PublicNet.IPv4.IP)),
+			fmt.Sprintf("Public IPv6: %s", formatIP(server.PublicNet.IPv6.IP)),
+			fmt.Sprintf("Floating IPs: %s", formatFloatingIPs(server.PublicNet.FloatingIPs)),
+		}
+		privateNetLines := formatPrivateNetworks(server)
+		if len(privateNetLines) > 0 {
+			networkLines = append(networkLines, "Private Networks:")
+			networkLines = append(networkLines, privateNetLines...)
+		}
+		detailView.WriteString(renderServerDetailSection("Networking", networkLines) + "\n\n")
+
+		subnetLines := formatServerSubnets(m.serverDetailNetworks)
+		detailView.WriteString(renderServerDetailSection("Subnets", subnetLines) + "\n\n")
+
+		firewallLines := formatServerFirewalls(server)
+		detailView.WriteString(renderServerDetailSection("Firewalls", firewallLines) + "\n\n")
+
+		loadBalancerLines := formatServerLoadBalancers(server)
+		detailView.WriteString(renderServerDetailSection("Load Balancers", loadBalancerLines) + "\n\n")
+
+		volumeLines := formatServerVolumes(server)
+		detailView.WriteString(renderServerDetailSection("Volumes", volumeLines) + "\n\n")
+
+		labelLines := formatServerLabels(server)
+		detailView.WriteString(renderServerDetailSection("Labels", labelLines) + "\n\n")
+
+		helpText := "💡 Press 'q' to return to resource view"
+		detailView.WriteString(helpStyle.Render(helpText))
+		return detailView.String()
 
 	case stateLabelView:
 		// Render the label View
@@ -407,4 +469,169 @@ func formatSubnetGateway(gateway net.IP) string {
 		return "n/a"
 	}
 	return gateway.String()
+}
+
+func renderServerDetailSection(title string, lines []string) string {
+	if len(lines) == 0 {
+		lines = []string{"No data available."}
+	}
+	content := strings.Join(lines, "\n")
+	return serverDetailSectionStyle.Render(serverDetailTitleStyle.Render(title) + "\n" + content)
+}
+
+func formatIP(ip net.IP) string {
+	if ip == nil || len(ip) == 0 {
+		return "n/a"
+	}
+	return ip.String()
+}
+
+func formatServerType(server *hcloud.Server) string {
+	if server.ServerType == nil {
+		return "n/a"
+	}
+	return server.ServerType.Name
+}
+
+func formatDatacenter(server *hcloud.Server) string {
+	if server.Datacenter == nil {
+		return "n/a"
+	}
+	return server.Datacenter.Name
+}
+
+func formatServerImage(server *hcloud.Server) string {
+	if server.Image == nil {
+		return "n/a"
+	}
+	if server.Image.Name != "" {
+		return server.Image.Name
+	}
+	return fmt.Sprintf("Image %d", server.Image.ID)
+}
+
+func formatFloatingIPs(floatingIPs []*hcloud.FloatingIP) string {
+	if len(floatingIPs) == 0 {
+		return "none"
+	}
+	parts := make([]string, 0, len(floatingIPs))
+	for _, floatingIP := range floatingIPs {
+		if floatingIP == nil {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s (ID: %d)", floatingIP.IP, floatingIP.ID))
+	}
+	if len(parts) == 0 {
+		return "none"
+	}
+	return strings.Join(parts, ", ")
+}
+
+func formatPrivateNetworks(server *hcloud.Server) []string {
+	if server == nil || len(server.PrivateNet) == 0 {
+		return []string{"No private networks attached."}
+	}
+	lines := make([]string, 0, len(server.PrivateNet))
+	for _, privateNet := range server.PrivateNet {
+		networkName := "unknown"
+		networkID := int64(0)
+		if privateNet.Network != nil {
+			networkName = privateNet.Network.Name
+			networkID = privateNet.Network.ID
+		}
+		aliasText := "none"
+		if len(privateNet.Aliases) > 0 {
+			aliases := make([]string, 0, len(privateNet.Aliases))
+			for _, alias := range privateNet.Aliases {
+				if alias != nil {
+					aliases = append(aliases, alias.String())
+				}
+			}
+			if len(aliases) > 0 {
+				aliasText = strings.Join(aliases, ", ")
+			}
+		}
+		lines = append(lines, fmt.Sprintf("• %s (ID: %d) | IP: %s | MAC: %s | Aliases: %s", networkName, networkID, formatIP(privateNet.IP), privateNet.MACAddress, aliasText))
+	}
+	return lines
+}
+
+func formatServerSubnets(networks []*hcloud.Network) []string {
+	if len(networks) == 0 {
+		return []string{"No subnets available."}
+	}
+	lines := []string{}
+	for _, network := range networks {
+		if network == nil {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s (ID: %d)", network.Name, network.ID))
+		if len(network.Subnets) == 0 {
+			lines = append(lines, "  • No subnets defined.")
+			continue
+		}
+		for _, subnet := range network.Subnets {
+			ipRange := "n/a"
+			if subnet.IPRange != nil {
+				ipRange = subnet.IPRange.String()
+			}
+			lines = append(lines, fmt.Sprintf("  • %s (%s) | Zone: %s | Gateway: %s", ipRange, strings.ToUpper(string(subnet.Type)), subnet.NetworkZone, formatSubnetGateway(subnet.Gateway)))
+		}
+	}
+	return lines
+}
+
+func formatServerFirewalls(server *hcloud.Server) []string {
+	if server == nil || len(server.PublicNet.Firewalls) == 0 {
+		return []string{"No firewalls attached."}
+	}
+	lines := make([]string, 0, len(server.PublicNet.Firewalls))
+	for _, firewallStatus := range server.PublicNet.Firewalls {
+		lines = append(lines, fmt.Sprintf("• %s (ID: %d) | Status: %s", firewallStatus.Firewall.Name, firewallStatus.Firewall.ID, firewallStatus.Status))
+	}
+	return lines
+}
+
+func formatServerLoadBalancers(server *hcloud.Server) []string {
+	if server == nil || len(server.LoadBalancers) == 0 {
+		return []string{"No load balancers attached."}
+	}
+	lines := make([]string, 0, len(server.LoadBalancers))
+	for _, lb := range server.LoadBalancers {
+		if lb == nil {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("• %s (ID: %d)", lb.Name, lb.ID))
+	}
+	return lines
+}
+
+func formatServerVolumes(server *hcloud.Server) []string {
+	if server == nil || len(server.Volumes) == 0 {
+		return []string{"No volumes attached."}
+	}
+	lines := make([]string, 0, len(server.Volumes))
+	for _, volume := range server.Volumes {
+		if volume == nil {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("• %s (ID: %d) | Size: %d GB", volume.Name, volume.ID, volume.Size))
+	}
+	return lines
+}
+
+func formatServerLabels(server *hcloud.Server) []string {
+	if server == nil || len(server.Labels) == 0 {
+		return []string{"No labels attached."}
+	}
+	keys := make([]string, 0, len(server.Labels))
+	for key := range server.Labels {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	lines := make([]string, 0, len(keys))
+	for _, key := range keys {
+		lines = append(lines, fmt.Sprintf("• %s=%s", key, server.Labels[key]))
+	}
+	return lines
 }

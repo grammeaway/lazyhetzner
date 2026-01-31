@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	ctm "github.com/grammeaway/lazyhetzner/internal/context_menu"
 	"github.com/grammeaway/lazyhetzner/internal/message"
 	"github.com/grammeaway/lazyhetzner/internal/resource"
 	"github.com/grammeaway/lazyhetzner/internal/resource/label"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"os"
 	"os/exec"
 	"runtime"
@@ -76,6 +76,7 @@ func getServerMenuItems(sessionInfo SessionInfo) []ctm.ContextMenuItem {
 	baseItems := []ctm.ContextMenuItem{
 		// add action for canceling (i.e., closing) the context menu
 		{Label: "❌ Cancel", Action: "cancel"},
+		{Label: "🔎 View Details", Action: "view_details"},
 		{Label: "🔖 View Labels", Action: "view_labels"},
 		{Label: "📋 Copy Public IP", Action: "copy_public_ip"},
 		// ipv6
@@ -120,7 +121,7 @@ func launchSSH(ip string, preferredTerminal string) tea.Cmd {
 				// Use preferred terminal if specified
 				cmd = exec.Command(preferredTerminal, "ssh", fmt.Sprintf("root@%s", ip))
 			} else {
-			cmd = exec.Command("osascript", "-e", fmt.Sprintf(`tell application "Terminal" to do script "ssh root@%s"`, ip))
+				cmd = exec.Command("osascript", "-e", fmt.Sprintf(`tell application "Terminal" to do script "ssh root@%s"`, ip))
 			}
 		case "linux":
 			// Try common terminal emulators
