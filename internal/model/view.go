@@ -289,7 +289,7 @@ func (m Model) View() string {
 		if server.PlacementGroup != nil {
 			overviewLines = append(overviewLines, fmt.Sprintf("Placement Group: %s", server.PlacementGroup.Name))
 		}
-		detailView.WriteString(renderServerDetailSection("Overview", overviewLines) + "\n\n")
+		overviewSection := renderServerDetailSection("Overview", overviewLines)
 
 		networkLines := []string{
 			fmt.Sprintf("Public IPv4: %s", formatIP(server.PublicNet.IPv4.IP)),
@@ -301,22 +301,24 @@ func (m Model) View() string {
 			networkLines = append(networkLines, "Private Networks:")
 			networkLines = append(networkLines, privateNetLines...)
 		}
-		detailView.WriteString(renderServerDetailSection("Networking", networkLines) + "\n\n")
+		networkSection := renderServerDetailSection("Networking", networkLines)
+		subnetSection := renderServerDetailSection("Subnets", formatServerSubnets(m.serverDetailNetworks))
+		firewallSection := renderServerDetailSection("Firewalls", formatServerFirewalls(server))
+		loadBalancerSection := renderServerDetailSection("Load Balancers", formatServerLoadBalancers(server))
+		volumeSection := renderServerDetailSection("Volumes", formatServerVolumes(server))
+		labelSection := renderServerDetailSection("Labels", formatServerLabels(server))
 
-		subnetLines := formatServerSubnets(m.serverDetailNetworks)
-		detailView.WriteString(renderServerDetailSection("Subnets", subnetLines) + "\n\n")
+		sections := []string{
+			overviewSection,
+			networkSection,
+			subnetSection,
+			firewallSection,
+			loadBalancerSection,
+			volumeSection,
+			labelSection,
+		}
 
-		firewallLines := formatServerFirewalls(server)
-		detailView.WriteString(renderServerDetailSection("Firewalls", firewallLines) + "\n\n")
-
-		loadBalancerLines := formatServerLoadBalancers(server)
-		detailView.WriteString(renderServerDetailSection("Load Balancers", loadBalancerLines) + "\n\n")
-
-		volumeLines := formatServerVolumes(server)
-		detailView.WriteString(renderServerDetailSection("Volumes", volumeLines) + "\n\n")
-
-		labelLines := formatServerLabels(server)
-		detailView.WriteString(renderServerDetailSection("Labels", labelLines) + "\n\n")
+		detailView.WriteString(renderServerDetailGrid(sections, m.width) + "\n\n")
 
 		helpText := "💡 Press 'q' to return to resource view"
 		detailView.WriteString(helpStyle.Render(helpText))
@@ -477,6 +479,28 @@ func renderServerDetailSection(title string, lines []string) string {
 	}
 	content := strings.Join(lines, "\n")
 	return serverDetailSectionStyle.Render(serverDetailTitleStyle.Render(title) + "\n" + content)
+}
+
+func renderServerDetailGrid(sections []string, width int) string {
+	if len(sections) == 0 {
+		return ""
+	}
+	columnWidth := max(40, (width-6)/2)
+	cellStyle := lipgloss.NewStyle().Width(columnWidth)
+
+	rows := make([]string, 0, (len(sections)+1)/2)
+	for i := 0; i < len(sections); i += 2 {
+		left := cellStyle.Render(sections[i])
+		right := ""
+		if i+1 < len(sections) {
+			right = cellStyle.Render(sections[i+1])
+		} else {
+			right = cellStyle.Render("")
+		}
+		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, left, right))
+	}
+
+	return strings.Join(rows, "\n\n")
 }
 
 func formatIP(ip net.IP) string {
