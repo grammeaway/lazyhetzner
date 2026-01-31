@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/ansi"
 	"github.com/grammeaway/lazyhetzner/internal/resource"
 	util "github.com/grammeaway/lazyhetzner/utility"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
@@ -481,8 +482,8 @@ func renderServerDetailSection(title string, lines []string, width int) string {
 	content := strings.Join(lines, "\n")
 	innerWidth := max(10, width-4)
 	innerStyle := lipgloss.NewStyle().Width(innerWidth).MaxWidth(innerWidth)
-	titleLine := innerStyle.Render(serverDetailTitleStyle.Render(title))
-	contentBlock := innerStyle.Render(content)
+	titleLine := innerStyle.Render(serverDetailTitleStyle.Render(ansi.Wrap(title, innerWidth, "")))
+	contentBlock := innerStyle.Render(ansi.Wrap(content, innerWidth, ""))
 	sectionStyle := serverDetailSectionStyle.Width(width).MaxWidth(width)
 	return sectionStyle.Render(lipgloss.JoinVertical(lipgloss.Left, titleLine, contentBlock))
 }
