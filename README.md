@@ -84,8 +84,6 @@ The TUI is decently slow, and performance improvements are definitely on the roa
 Some menu items are pretty ugly (design isn't my strong suit) - these things bother me in my day-to-day use, so I will make sure to improve them in the future.
 
 ## Roadmap
-- [ ] Add visualizations for for the resources:
-    - [ ] Floating IPs
 - [ ] Add visualizations for the sub-resources:
     - [ ] Subnets
     - [ ] Server backups
