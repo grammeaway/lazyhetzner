@@ -3,10 +3,10 @@ package model
 import (
 	"fmt"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/ansi"
 	"github.com/grammeaway/lazyhetzner/internal/resource"
 	util "github.com/grammeaway/lazyhetzner/utility"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
+	"github.com/mattn/go-runewidth"
 	"net"
 	"sort"
 	"strings"
@@ -482,8 +482,8 @@ func renderServerDetailSection(title string, lines []string, width int) string {
 	content := strings.Join(lines, "\n")
 	innerWidth := max(10, width-4)
 	innerStyle := lipgloss.NewStyle().Width(innerWidth).MaxWidth(innerWidth)
-	titleLine := innerStyle.Render(serverDetailTitleStyle.Render(ansi.Wrap(title, innerWidth, "")))
-	contentBlock := innerStyle.Render(ansi.Wrap(content, innerWidth, ""))
+	titleLine := innerStyle.Render(serverDetailTitleStyle.Render(wrapText(title, innerWidth)))
+	contentBlock := innerStyle.Render(wrapText(content, innerWidth))
 	sectionStyle := serverDetailSectionStyle.Width(width).MaxWidth(width)
 	return sectionStyle.Render(lipgloss.JoinVertical(lipgloss.Left, titleLine, contentBlock))
 }
@@ -547,6 +547,46 @@ func formatIP(ip net.IP) string {
 		return "n/a"
 	}
 	return ip.String()
+}
+
+func wrapText(text string, width int) string {
+	if width <= 0 || text == "" {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+	wrapped := make([]string, 0, len(lines))
+	for _, line := range lines {
+		wrapped = append(wrapped, wrapLine(line, width)...)
+	}
+	return strings.Join(wrapped, "\n")
+}
+
+func wrapLine(line string, width int) []string {
+	if width <= 0 {
+		return []string{line}
+	}
+	if runewidth.StringWidth(line) <= width {
+		return []string{line}
+	}
+	var (
+		lines []string
+		buf   strings.Builder
+		count int
+	)
+	for _, r := range line {
+		rw := runewidth.RuneWidth(r)
+		if count+rw > width {
+			lines = append(lines, buf.String())
+			buf.Reset()
+			count = 0
+		}
+		buf.WriteRune(r)
+		count += rw
+	}
+	if buf.Len() > 0 {
+		lines = append(lines, buf.String())
+	}
+	return lines
 }
 
 func formatServerType(server *hcloud.Server) string {
