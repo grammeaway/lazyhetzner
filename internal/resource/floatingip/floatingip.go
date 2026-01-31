@@ -34,7 +34,8 @@ func (i FloatingIPItem) Description() string {
 	if i.FloatingIP.IP != nil {
 		ipAddress = i.FloatingIP.IP.String()
 	}
-	return fmt.Sprintf("%s | %s | %s", status, strings.ToUpper(string(i.FloatingIP.Type)), ipAddress)
+	protocol := floatingIPProtocolDisplay(i.FloatingIP.Type)
+	return fmt.Sprintf("%s | %s | %s", status, protocol, ipAddress)
 }
 
 func LoadFloatingIPs(client *hcloud.Client) tea.Cmd {
@@ -70,4 +71,15 @@ func floatingIPDisplayName(floatingIP *hcloud.FloatingIP) string {
 		return floatingIP.IP.String()
 	}
 	return fmt.Sprintf("Floating IP %d", floatingIP.ID)
+}
+
+func floatingIPProtocolDisplay(protocol hcloud.FloatingIPType) string {
+	switch protocol {
+	case hcloud.FloatingIPTypeIPv4:
+		return "🧭 IPv4"
+	case hcloud.FloatingIPTypeIPv6:
+		return "🌐 IPv6"
+	default:
+		return fmt.Sprintf("❓ %s", strings.ToUpper(string(protocol)))
+	}
 }
