@@ -114,4 +114,23 @@ var (
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("#444444")).
 				Background(lipgloss.Color("#0f0f0f"))
+	firewallRuleStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FFFDF5")).
+				Background(lipgloss.Color("#1a1a1a")).
+				Padding(0, 1).
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("#626262"))
+	noFirewallRulesStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FFAA00")).
+				Background(lipgloss.Color("#2a1a00")).
+				Padding(1, 2).
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("#FFAA00")).
+				Italic(true)
+	firewallRuleContainerStyle = lipgloss.NewStyle().
+					Margin(0, 0, 1, 0).
+					Padding(1).
+					Border(lipgloss.RoundedBorder()).
+					BorderForeground(lipgloss.Color("#444444")).
+					Background(lipgloss.Color("#0f0f0f"))
 )

@@ -5,6 +5,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/grammeaway/lazyhetzner/internal/resource"
 	util "github.com/grammeaway/lazyhetzner/utility"
+	"net"
 	"strings"
 )
 
@@ -139,7 +140,7 @@ func (m Model) View() string {
 			statusView,
 			helpStyle.Render(helpText),
 		)
-        case stateLoadBalancerServiceView:
+	case stateLoadBalancerServiceView:
 		// Render the Load Balancer services, as a list of loadbalancerServices
 		var serviceView strings.Builder
 		serviceView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("Load Balancer Services")))
@@ -204,7 +205,34 @@ func (m Model) View() string {
 		helpText := "💡 Press 'q' to return to Load Balancer view"
 		targetView.WriteString("\n" + helpStyle.Render(helpText))
 		return targetView.String()
-
+	case stateFirewallRuleView:
+		var ruleView strings.Builder
+		ruleView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("Firewall Rules")))
+		resourceInfo := fmt.Sprintf("🧱 Rules for Firewall: %s", m.firewallBeingViewed.Name)
+		ruleView.WriteString(infoStyle.Render(resourceInfo) + "\n\n")
+		if len(m.firewallRules) == 0 {
+			noRulesMsg := "⚠️  No rules found for this Firewall"
+			ruleView.WriteString(noFirewallRulesStyle.Render(noRulesMsg) + "\n")
+		} else {
+			var rulesContent strings.Builder
+			rulesContent.WriteString(fmt.Sprintf("Found %d rule(s):\n\n", len(m.firewallRules)))
+			for i, rule := range m.firewallRules {
+				ruleDesc := fmt.Sprintf("🧱 Rule %d: %s %s %s", i+1, strings.ToUpper(string(rule.Direction)), strings.ToUpper(string(rule.Protocol)), formatFirewallPort(rule.Port))
+				ruleDetails := fmt.Sprintf("Sources: %s | Destinations: %s", formatIPNets(rule.SourceIPs), formatIPNets(rule.DestinationIPs))
+				if rule.Description != nil && *rule.Description != "" {
+					ruleDetails = fmt.Sprintf("%s | %s", ruleDetails, *rule.Description)
+				}
+				ruleStyled := firewallRuleStyle.Render(ruleDesc + "\n" + ruleDetails)
+				rulesContent.WriteString(ruleStyled + "\n")
+				if i < len(m.firewallRules)-1 {
+					rulesContent.WriteString("\n")
+				}
+			}
+			ruleView.WriteString(firewallRuleContainerStyle.Render(rulesContent.String()) + "\n")
+		}
+		helpText := "💡 Press 'q' to return to Firewall view"
+		ruleView.WriteString("\n" + helpStyle.Render(helpText))
+		return ruleView.String()
 
 	case stateLabelView:
 		// Render the label View
@@ -328,4 +356,22 @@ func (m Model) View() string {
 	}
 
 	return ""
+}
+
+func formatFirewallPort(port *string) string {
+	if port == nil || *port == "" {
+		return "all ports"
+	}
+	return fmt.Sprintf("port %s", *port)
+}
+
+func formatIPNets(nets []net.IPNet) string {
+	if len(nets) == 0 {
+		return "any"
+	}
+	parts := make([]string, 0, len(nets))
+	for _, ipNet := range nets {
+		parts = append(parts, ipNet.String())
+	}
+	return strings.Join(parts, ", ")
 }

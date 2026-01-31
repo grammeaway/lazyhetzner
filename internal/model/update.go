@@ -1,28 +1,29 @@
-
-package model 
+package model
 
 import (
 	"fmt"
-	"strings"
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/grammeaway/lazyhetzner/internal/config"
-	ctm_serv "github.com/grammeaway/lazyhetzner/internal/context_menu/server"
-	ctm_n "github.com/grammeaway/lazyhetzner/internal/context_menu/network"
+	ctm_fw "github.com/grammeaway/lazyhetzner/internal/context_menu/firewall"
 	ctm_lb "github.com/grammeaway/lazyhetzner/internal/context_menu/loadbalancer"
+	ctm_n "github.com/grammeaway/lazyhetzner/internal/context_menu/network"
+	ctm_serv "github.com/grammeaway/lazyhetzner/internal/context_menu/server"
 	ctm_vol "github.com/grammeaway/lazyhetzner/internal/context_menu/volume"
 	"github.com/grammeaway/lazyhetzner/internal/input_form/project"
 	"github.com/grammeaway/lazyhetzner/internal/message"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/hetznercloud/hcloud-go/v2/hcloud"
-	util "github.com/grammeaway/lazyhetzner/utility"
 	"github.com/grammeaway/lazyhetzner/internal/resource"
+	r_fw "github.com/grammeaway/lazyhetzner/internal/resource/firewall"
+	r_label "github.com/grammeaway/lazyhetzner/internal/resource/label"
+	r_lb "github.com/grammeaway/lazyhetzner/internal/resource/loadbalancer"
+	r_n "github.com/grammeaway/lazyhetzner/internal/resource/network"
 	r_prj "github.com/grammeaway/lazyhetzner/internal/resource/project"
 	r_serv "github.com/grammeaway/lazyhetzner/internal/resource/server"
 	r_vol "github.com/grammeaway/lazyhetzner/internal/resource/volume"
-	r_lb "github.com/grammeaway/lazyhetzner/internal/resource/loadbalancer"
-	r_n "github.com/grammeaway/lazyhetzner/internal/resource/network"
-	r_label "github.com/grammeaway/lazyhetzner/internal/resource/label"
+	util "github.com/grammeaway/lazyhetzner/utility"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
+	"strings"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -111,14 +112,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.State = stateResourceView
 				return m, nil
 			case stateLoadBalancerTargetView:
-				// From load balancer target view, go back to resource view 
-				m.State = stateResourceView 
-				return m, nil 
+				// From load balancer target view, go back to resource view
+				m.State = stateResourceView
+				return m, nil
 			case stateLoadBalancerServiceView:
-				// From load balancer service view, go back to resource view 
-				m.State = stateResourceView 
-				return m, nil 
-			
+				// From load balancer service view, go back to resource view
+				m.State = stateResourceView
+				return m, nil
+			case stateFirewallRuleView:
+				m.State = stateResourceView
+				return m, nil
+
 			}
 		}
 
@@ -208,7 +212,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if currentList, exists := m.Lists[resource.ResourceServers]; exists {
 						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
 							if serverItem, ok := selectedItem.(r_serv.ServerItem); ok {
-								m.contextMenu = ctm_serv.CreateServerContextMenu(serverItem.Server) 
+								m.contextMenu = ctm_serv.CreateServerContextMenu(serverItem.Server)
 								m.State = stateContextMenu
 							}
 						}
@@ -241,9 +245,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							}
 						}
 					}
-
-
-}				
+				case resource.ResourceFirewalls:
+					if currentList, exists := m.Lists[resource.ResourceFirewalls]; exists {
+						if selectedItem := currentList.SelectedItem(); selectedItem != nil {
+							if firewallItem, ok := selectedItem.(r_fw.FirewallItem); ok {
+								m.contextMenu = ctm_fw.CreateFirewallContextMenu(firewallItem.Firewall)
+								m.State = stateContextMenu
+							}
+						}
+					}
+				}
 
 			case key.Matches(msg, keys.Tab):
 				m.activeTab = (m.activeTab + 1) % resource.ResourceType(len(resourceTabs))
@@ -310,7 +321,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, keys.Enter):
 				selectedAction := m.contextMenu.Items[m.contextMenu.SelectedItem].Action
 				m.State = stateResourceView
-				return m, m.executeContextAction(selectedAction, m.contextMenu.ResourceType, m.contextMenu.ResourceID) 
+				return m, m.executeContextAction(selectedAction, m.contextMenu.ResourceType, m.contextMenu.ResourceID)
 
 			case key.Matches(msg, keys.Num1, keys.Num2, keys.Num3, keys.Num4, keys.Num5,
 				keys.Num6, keys.Num7, keys.Num8, keys.Num9, keys.Num0):
@@ -348,7 +359,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		serverItems := make([]list.Item, len(msg.Servers))
 		for i, server := range msg.Servers {
 			serverItems[i] = r_serv.ServerItem{
-				Server: server,
+				Server:       server,
 				ResourceType: resource.ResourceServers,
 				ResourceID:   server.ID,
 			}
@@ -367,7 +378,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		networkItems := make([]list.Item, len(msg.Networks))
 		for i, network := range msg.Networks {
 			networkItems[i] = r_n.NetworkItem{
-				Network: network,
+				Network:      network,
 				ResourceType: resource.ResourceNetworks,
 				ResourceID:   network.ID,
 			}
@@ -386,7 +397,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		lbItems := make([]list.Item, len(msg.LoadBalancers))
 		for i, lb := range msg.LoadBalancers {
 			lbItems[i] = r_lb.LoadBalancerItem{
-				Lb: lb,
+				Lb:           lb,
 				ResourceType: resource.ResourceLoadBalancers,
 				ResourceID:   lb.ID,
 			}
@@ -395,8 +406,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		lbList := list.New(lbItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
 		lbList.Title = "Load Balancers"
 		m.Lists[resource.ResourceLoadBalancers] = lbList
-	        return m, nil
-	
+		return m, nil
+
+	case r_fw.FirewallsLoadedMsg:
+		m.IsLoading = false
+		m.LoadedResources[resource.ResourceFirewalls] = true
+
+		firewallItems := make([]list.Item, len(msg.Firewalls))
+		for i, firewall := range msg.Firewalls {
+			firewallItems[i] = r_fw.FirewallItem{
+				Firewall:     firewall,
+				ResourceType: resource.ResourceFirewalls,
+				ResourceID:   firewall.ID,
+			}
+		}
+
+		firewallsList := list.New(firewallItems, list.NewDefaultDelegate(), m.width-4, m.height-10)
+		firewallsList.Title = "Firewalls"
+		m.Lists[resource.ResourceFirewalls] = firewallsList
+		return m, nil
+
 	case r_vol.VolumesLoadedMsg:
 		m.IsLoading = false
 		m.LoadedResources[resource.ResourceVolumes] = true
@@ -438,15 +467,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.IsLoading = false
 		m.loadbalancerBeingViewed = msg.LoadBalancer
 		m.loadbalancerTargets = msg.Targets
-		m.State = stateLoadBalancerTargetView 
+		m.State = stateLoadBalancerTargetView
 		return m, nil
 
 	case r_lb.ViewLoadbalancerServicesMsg:
-		m.IsLoading = false 
-		m.loadbalancerBeingViewed = msg.LoadBalancer 
-		m.loadbalancerServices = msg.Services 
-		m.State = stateLoadBalancerServiceView 
-		return m, nil 
+		m.IsLoading = false
+		m.loadbalancerBeingViewed = msg.LoadBalancer
+		m.loadbalancerServices = msg.Services
+		m.State = stateLoadBalancerServiceView
+		return m, nil
+
+	case r_fw.ViewFirewallRulesMsg:
+		m.IsLoading = false
+		m.firewallBeingViewed = msg.Firewall
+		m.firewallRules = msg.Rules
+		m.State = stateFirewallRuleView
+		return m, nil
 
 	case message.CancelCtxMenuMsg:
 		// close the context menu and return to resource view
