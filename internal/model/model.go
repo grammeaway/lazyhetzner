@@ -10,6 +10,7 @@ import (
 	"github.com/grammeaway/lazyhetzner/internal/config"
 	ctm "github.com/grammeaway/lazyhetzner/internal/context_menu"
 	ctm_fw "github.com/grammeaway/lazyhetzner/internal/context_menu/firewall"
+	ctm_fip "github.com/grammeaway/lazyhetzner/internal/context_menu/floatingip"
 	ctm_lb "github.com/grammeaway/lazyhetzner/internal/context_menu/loadbalancer"
 	ctm_n "github.com/grammeaway/lazyhetzner/internal/context_menu/network"
 	ctm_serv "github.com/grammeaway/lazyhetzner/internal/context_menu/server"
@@ -18,6 +19,7 @@ import (
 	"github.com/grammeaway/lazyhetzner/internal/message"
 	"github.com/grammeaway/lazyhetzner/internal/resource"
 	r_fw "github.com/grammeaway/lazyhetzner/internal/resource/firewall"
+	r_fip "github.com/grammeaway/lazyhetzner/internal/resource/floatingip"
 	r_lb "github.com/grammeaway/lazyhetzner/internal/resource/loadbalancer"
 	r_n "github.com/grammeaway/lazyhetzner/internal/resource/network"
 	r_prj "github.com/grammeaway/lazyhetzner/internal/resource/project"
@@ -59,7 +61,7 @@ type Model struct {
 
 // Resource types for tabs
 
-var resourceTabs = []string{"Servers", "Networks", "Load Balancers", "Firewalls", "Volumes"}
+var resourceTabs = []string{"Servers", "Networks", "Load Balancers", "Floating IPs", "Firewalls", "Volumes"}
 
 func (m *Model) getResourceLoadCmd(rt resource.ResourceType) tea.Cmd {
 	if m.client == nil {
@@ -73,6 +75,8 @@ func (m *Model) getResourceLoadCmd(rt resource.ResourceType) tea.Cmd {
 		return r_n.LoadNetworks(m.client)
 	case resource.ResourceLoadBalancers:
 		return r_lb.LoadLoadBalancers(m.client)
+	case resource.ResourceFloatingIPs:
+		return r_fip.LoadFloatingIPs(m.client)
 	case resource.ResourceFirewalls:
 		return r_fw.LoadFirewalls(m.client)
 	case resource.ResourceVolumes:
@@ -163,6 +167,25 @@ func (m *Model) executeContextAction(selectedAction string, resourceType resourc
 			}
 		}
 		return ctm_fw.ExecuteFirewallContextAction(selectedAction, firewall)
+	case resource.ResourceFloatingIPs:
+		floatingIP, _, err := m.client.FloatingIP.Get(context.Background(), strconv.FormatInt(resourceID, 10))
+		if err != nil {
+			return func() tea.Msg {
+				return message.ErrorMsg{err}
+			}
+		}
+		if floatingIP == nil {
+			return func() tea.Msg {
+				return message.ErrorMsg{fmt.Errorf("floating IP with ID %d not found", resourceID)}
+			}
+		}
+		if floatingIP.Server != nil {
+			server, _, err := m.client.Server.GetByID(context.Background(), floatingIP.Server.ID)
+			if err == nil && server != nil {
+				floatingIP.Server = server
+			}
+		}
+		return ctm_fip.ExecuteFloatingIPContextAction(selectedAction, floatingIP)
 	}
 
 	return nil
