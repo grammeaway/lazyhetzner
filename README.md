@@ -85,7 +85,6 @@ Some menu items are pretty ugly (design isn't my strong suit) - these things bot
 
 ## Roadmap
 - [ ] Add visualizations for the sub-resources:
-    - [ ] Subnets
     - [ ] Server backups
     - [ ] Server snapshots
     - [ ] Server placement groups
