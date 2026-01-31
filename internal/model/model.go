@@ -57,6 +57,8 @@ type Model struct {
 	loadbalancerServices       []hcloud.LoadBalancerService
 	firewallBeingViewed        *hcloud.Firewall
 	firewallRules              []hcloud.FirewallRule
+	networkBeingViewed         *hcloud.Network
+	networkSubnets             []hcloud.NetworkSubnet
 }
 
 // Resource types for tabs

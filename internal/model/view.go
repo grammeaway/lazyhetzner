@@ -234,6 +234,32 @@ func (m Model) View() string {
 		ruleView.WriteString("\n" + helpStyle.Render(helpText))
 		return ruleView.String()
 
+	case stateNetworkSubnetView:
+		var subnetView strings.Builder
+		subnetView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("Network Subnets")))
+		resourceInfo := fmt.Sprintf("🧩 Subnets for Network: %s", m.networkBeingViewed.Name)
+		subnetView.WriteString(infoStyle.Render(resourceInfo) + "\n\n")
+		if len(m.networkSubnets) == 0 {
+			noSubnetsMsg := "⚠️  No subnets found for this Network"
+			subnetView.WriteString(noSubnetsStyle.Render(noSubnetsMsg) + "\n")
+		} else {
+			var subnetsContent strings.Builder
+			subnetsContent.WriteString(fmt.Sprintf("Found %d subnet(s):\n\n", len(m.networkSubnets)))
+			for i, subnet := range m.networkSubnets {
+				subnetDesc := fmt.Sprintf("🧩 Subnet %d: %s (%s)", i+1, subnet.IPRange.String(), strings.ToUpper(string(subnet.Type)))
+				subnetDetails := fmt.Sprintf("Network Zone: %s | Gateway: %s", subnet.NetworkZone, formatSubnetGateway(subnet.Gateway))
+				subnetStyled := subnetStyle.Render(subnetDesc + "\n" + subnetDetails)
+				subnetsContent.WriteString(subnetStyled + "\n")
+				if i < len(m.networkSubnets)-1 {
+					subnetsContent.WriteString("\n")
+				}
+			}
+			subnetView.WriteString(subnetContainerStyle.Render(subnetsContent.String()) + "\n")
+		}
+		helpText := "💡 Press 'q' to return to Network view"
+		subnetView.WriteString("\n" + helpStyle.Render(helpText))
+		return subnetView.String()
+
 	case stateLabelView:
 		// Render the label View
 		var labelView strings.Builder
@@ -374,4 +400,11 @@ func formatIPNets(nets []net.IPNet) string {
 		parts = append(parts, ipNet.String())
 	}
 	return strings.Join(parts, ", ")
+}
+
+func formatSubnetGateway(gateway net.IP) string {
+	if gateway == nil || len(gateway) == 0 {
+		return "n/a"
+	}
+	return gateway.String()
 }

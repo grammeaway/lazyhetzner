@@ -124,6 +124,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case stateFirewallRuleView:
 				m.State = stateResourceView
 				return m, nil
+			case stateNetworkSubnetView:
+				m.State = stateResourceView
+				return m, nil
 
 			}
 		}
@@ -511,6 +514,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.firewallBeingViewed = msg.Firewall
 		m.firewallRules = msg.Rules
 		m.State = stateFirewallRuleView
+		return m, nil
+	case r_n.ViewNetworkSubnetsMsg:
+		m.IsLoading = false
+		m.networkBeingViewed = msg.Network
+		m.networkSubnets = msg.Subnets
+		m.State = stateNetworkSubnetView
 		return m, nil
 
 	case message.CancelCtxMenuMsg:
