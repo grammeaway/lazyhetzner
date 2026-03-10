@@ -161,6 +161,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, keys.Add):
 				m.projectForm = project.NewProjectForm()
 				m.State = stateProjectManage
+				return m, nil
 
 			case key.Matches(msg, keys.Delete):
 				if selectedItem := m.projectList.SelectedItem(); selectedItem != nil {
@@ -182,6 +183,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.TerminalInput.SetValue(m.config.DefaultTerminal)
 				m.TerminalInput.Focus()
 				m.State = stateTerminalConfig
+				return m, nil
 			}
 
 		case stateProjectManage:
