@@ -35,7 +35,7 @@ Notable features include:
 Clone the repository and run the following commands to install the dependencies and build the binary:
 
 ```bash
-go install github.com/lazyhetzner@latest
+go install github.com/grammeaway/lazyhetzner@latest
 ```
 This will install the `lazyhetzner` binary in your `$GOPATH/bin` directory. Make sure to add this directory to your `PATH` environment variable if it's not already included.
 
