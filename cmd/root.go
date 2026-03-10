@@ -28,9 +28,15 @@ func initialModel() model.Model {
 	lists := make(map[resource.ResourceType]list.Model)
 	loadedResources := make(map[resource.ResourceType]bool)
 
+	terminalInput := textinput.New()
+	terminalInput.Placeholder = "Terminal command (e.g., kitty, alacritty); leave empty for auto-detect"
+	terminalInput.CharLimit = 128
+	terminalInput.Width = 70
+
 	return model.Model{
 		State:           model.StateProjectSelect,
 		TokenInput:      ti,
+		TerminalInput:   terminalInput,
 		Lists:           lists,
 		Help:            help.New(),
 		LoadedResources: loadedResources,

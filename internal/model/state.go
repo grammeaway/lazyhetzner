@@ -6,6 +6,7 @@ type state int
 const (
 	StateProjectSelect state = iota
 	stateProjectManage
+	stateTerminalConfig
 	stateTokenInput
 	stateLoading
 	stateResourceView
