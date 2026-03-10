@@ -95,3 +95,6 @@ Some menu items are pretty ugly (design isn't my strong suit) - these things bot
 
 ## Contributing
 If you would like to contribute to this project, please fork the repository and submit a pull request. Contributions are welcome!
+
+## AI Usage Disclosure
+This project was built using ChatGPT Codex, and Claude, to sped up feature-releases after establishing the initial codebase structure.
