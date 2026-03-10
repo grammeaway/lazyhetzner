@@ -60,7 +60,9 @@ lazyhetzner version
 
 
 ## Persisting and Managing Multiple Projects
-To persist and manage multiple projects, you need to create a ```config.json``` in the ```~/.config/lazyhetzner/``` directory. This file should contain a JSON object with the following structure:
+You can persist and manage multiple projects directly in the TUI (`a` to add, `d` to delete, `p` to set default project, `t` to set default terminal).
+
+If you prefer editing manually, create a ```config.json``` in the ```~/.config/lazyhetzner/``` directory with the following structure:
 
 ```jsonc
 {
@@ -80,8 +82,6 @@ To persist and manage multiple projects, you need to create a ```config.json``` 
 ```
 
 ## Known Issues
-Currently, the flow for persisting project configurations in the TUI itself, is quite clunky and unstable. It also doesn't offer a convenient way of setting your defualt project (it'll just tag on to whatever project you set first). It is highly recommended to manually create the `config.json` file as described above.
-
 The TUI is decently slow, and performance improvements are definitely on the roadmap.
 
 Some menu items are pretty ugly (design isn't my strong suit) - these things bother me in my day-to-day use, so I will make sure to improve them in the future.

@@ -35,6 +35,7 @@ type Model struct {
 	State                      state
 	config                     *config.Config
 	TokenInput                 textinput.Model
+	TerminalInput              textinput.Model
 	projectForm                input_form.InputForm
 	projectList                list.Model
 	client                     *hcloud.Client
@@ -213,4 +214,13 @@ func (m *Model) updateProjectList() {
 
 	m.projectList = list.New(items, list.NewDefaultDelegate(), m.width-4, m.height-8)
 	m.projectList.Title = "Hetzner Cloud Projects"
+}
+
+func (m *Model) setDefaultProject(name string) {
+	m.config.DefaultProject = name
+	m.currentProject = name
+}
+
+func (m *Model) setDefaultTerminal(terminal string) {
+	m.config.DefaultTerminal = terminal
 }

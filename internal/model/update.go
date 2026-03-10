@@ -50,10 +50,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for i := range m.projectForm.Inputs {
 			m.projectForm.Inputs[i].Width = min(50, msg.Width-10)
 		}
+		m.TerminalInput.Width = min(70, msg.Width-10)
 
 	case config.ConfigLoadedMsg:
 		m.config = msg.Config
 		m.updateProjectList()
+		m.TerminalInput.SetValue(m.config.DefaultTerminal)
 
 		// If there's a default project, set it up but don't load resources yet
 		if m.config.DefaultProject != "" {
@@ -107,6 +109,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case stateProjectManage:
 				// From project manage, go back to project select
+				m.State = StateProjectSelect
+				return m, nil
+			case stateTerminalConfig:
 				m.State = StateProjectSelect
 				return m, nil
 			case stateContextMenu:
@@ -165,6 +170,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, config.SaveConfigCmd(m.config)
 					}
 				}
+			case key.Matches(msg, keys.SetDefaultProject):
+				if selectedItem := m.projectList.SelectedItem(); selectedItem != nil {
+					if projectItem, ok := selectedItem.(r_prj.ProjectItem); ok {
+						m.setDefaultProject(projectItem.Config.Name)
+						m.updateProjectList()
+						return m, config.SaveConfigCmd(m.config)
+					}
+				}
+			case key.Matches(msg, keys.SetDefaultTerminal):
+				m.TerminalInput.SetValue(m.config.DefaultTerminal)
+				m.TerminalInput.Focus()
+				m.State = stateTerminalConfig
 			}
 
 		case stateProjectManage:
@@ -190,6 +207,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.State = StateProjectSelect
 					return m, config.SaveConfigCmd(m.config)
 				}
+			}
+
+		case stateTerminalConfig:
+			switch {
+			case key.Matches(msg, keys.Enter):
+				m.setDefaultTerminal(strings.TrimSpace(m.TerminalInput.Value()))
+				m.State = StateProjectSelect
+				m.TerminalInput.Blur()
+				return m, config.SaveConfigCmd(m.config)
 			}
 
 		case stateTokenInput:
@@ -572,6 +598,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.State == stateProjectManage {
 		var cmd tea.Cmd
 		m.projectForm.Inputs[m.projectForm.FocusIdx], cmd = m.projectForm.Inputs[m.projectForm.FocusIdx].Update(msg)
+		return m, cmd
+	}
+
+	if m.State == stateTerminalConfig {
+		var cmd tea.Cmd
+		m.TerminalInput, cmd = m.TerminalInput.Update(msg)
 		return m, cmd
 	}
 

@@ -43,7 +43,7 @@ func (m Model) View() string {
 			titleStyle.Render("lazyhetzner"),
 			m.projectList.View(),
 			statusView,
-			helpStyle.Render("Enter: select project • a: add project • d: delete project • q: quit"),
+			helpStyle.Render("Enter: select project • a: add project • d: delete project • p: set default project • t: set default terminal • q: quit"),
 		)
 
 	case stateProjectManage:
@@ -73,6 +73,15 @@ func (m Model) View() string {
 			titleStyle.Render("lazyhetzner - Add Project"),
 			formView.String(),
 		)
+	case stateTerminalConfig:
+		return fmt.Sprintf(
+			"\n%s\n\n%s\n\n%s\n\n%s\n",
+			titleStyle.Render("lazyhetzner - Default Terminal"),
+			infoStyle.Render("Set the default terminal executable for SSH actions. Leave empty to use automatic detection."),
+			m.TerminalInput.View(),
+			helpStyle.Render("Enter: save • q/esc: cancel"),
+		)
+
 	case stateTokenInput:
 		return fmt.Sprintf(
 			"\n%s\n\n%s\n\n%s\n\n%s\n",
@@ -480,14 +489,14 @@ func renderServerDetailSection(title string, lines []string, width int) string {
 		lines = []string{"No data available."}
 	}
 	content := strings.Join(lines, "\n")
-	
+
 	// Account for padding (0,1) = 2 horizontal padding + border (2) = 4 total
 	innerWidth := max(10, width-4)
-	
+
 	innerStyle := lipgloss.NewStyle().Width(innerWidth).MaxWidth(innerWidth)
 	titleLine := innerStyle.Render(serverDetailTitleStyle.Render(wrapText(title, innerWidth)))
 	contentBlock := innerStyle.Render(wrapText(content, innerWidth))
-	
+
 	return serverDetailSectionStyle.Render(lipgloss.JoinVertical(lipgloss.Left, titleLine, contentBlock))
 }
 func serverDetailGridLayout(width int) (int, int, int) {
