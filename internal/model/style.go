@@ -161,4 +161,20 @@ var (
 	serverDetailTitleStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#93c5fd")).
 				Bold(true)
+
+	healthyStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#04B575")).
+			Bold(true)
+
+	unhealthyStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FF0000")).
+			Bold(true)
+
+	mixedHealthStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FFAA00")).
+				Bold(true)
+
+	healthCheckDetailStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#626262")).
+				Italic(true)
 )
