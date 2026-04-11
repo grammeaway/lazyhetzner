@@ -153,67 +153,85 @@ func (m Model) View() string {
 			helpStyle.Render(helpText),
 		)
 	case stateLoadBalancerServiceView:
-		// Render the Load Balancer services, as a list of loadbalancerServices
 		var serviceView strings.Builder
 		serviceView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("Load Balancer Services")))
-		resourceInfo := fmt.Sprintf("🔌Services for Load Balancer: %s", m.loadbalancerBeingViewed.Name)
+		resourceInfo := fmt.Sprintf("🔌 Services for Load Balancer: %s", m.loadbalancerBeingViewed.Name)
 		serviceView.WriteString(infoStyle.Render(resourceInfo) + "\n\n")
 		if len(m.loadbalancerServices) == 0 {
 			noServicesMsg := "⚠️  No services found for this Load Balancer"
 			serviceView.WriteString(noServicesStyle.Render(noServicesMsg) + "\n")
 		} else {
-			// Create a container for all loadbalancerServices
 			var servicesContent strings.Builder
 			servicesContent.WriteString(fmt.Sprintf("Found %d service(s):\n\n", len(m.loadbalancerServices)))
-			// Render each service with improved styling
 			for i, service := range m.loadbalancerServices {
-				// Create a styled service description
-				serviceDesc := fmt.Sprintf("🔌Service %d: %s (Protocol: %s, Port: %d -> %d)", i+1, service.Protocol, service.Protocol, service.ListenPort, service.DestinationPort)
-				serviceStyled := serviceStyle.Render(serviceDesc)
-				// Add the service to the content
-				servicesContent.WriteString(serviceStyled + "\n")
-				// Add spacing between services (except for the last one)
+				serviceDesc := fmt.Sprintf("🔌 Service %d: %s (Port: %d -> %d)", i+1, strings.ToUpper(string(service.Protocol)), service.ListenPort, service.DestinationPort)
+				hcDetail := formatHealthCheck(service.HealthCheck)
+				serviceDesc += "\n" + healthCheckDetailStyle.Render(hcDetail)
+				servicesContent.WriteString(serviceStyle.Render(serviceDesc) + "\n")
 				if i < len(m.loadbalancerServices)-1 {
 					servicesContent.WriteString("\n")
 				}
 			}
-			// Wrap all services in a container
 			serviceView.WriteString(serviceContainerStyle.Render(servicesContent.String()) + "\n")
 		}
-		// Enhanced help text
 		helpText := "💡 Press 'q' to return to Load Balancer view"
 		serviceView.WriteString("\n" + helpStyle.Render(helpText))
 		return serviceView.String()
 
 	case stateLoadBalancerTargetView:
-		// Render the Load Balancer targets, as a list of loadbalancerTargets
 		var targetView strings.Builder
 		targetView.WriteString(fmt.Sprintf("%s\n\n", titleStyle.Render("Load Balancer Targets")))
-		resourceInfo := fmt.Sprintf("🎯Targets for Load Balancer: %s", m.loadbalancerBeingViewed.Name)
+		resourceInfo := fmt.Sprintf("🎯 Targets for Load Balancer: %s", m.loadbalancerBeingViewed.Name)
 		targetView.WriteString(infoStyle.Render(resourceInfo) + "\n\n")
 		if len(m.loadbalancerTargets) == 0 {
 			noTargetsMsg := "⚠️  No targets found for this Load Balancer"
 			targetView.WriteString(noTargetsStyle.Render(noTargetsMsg) + "\n")
 		} else {
-			// Create a container for all loadbalancerTargets
 			var targetsContent strings.Builder
 			targetsContent.WriteString(fmt.Sprintf("Found %d target(s):\n\n", len(m.loadbalancerTargets)))
-			// Render each target with improved styling
 			for i, target := range m.loadbalancerTargets {
-				// Create a styled target description
-				targetDesc := fmt.Sprintf("🎯Target %d: %s (Type: %s, Target count: %d)", i+1, target.LabelSelector.Selector, target.Type, len(target.Targets))
-				targetStyled := targetStyle.Render(targetDesc)
-				// Add the target to the content
-				targetsContent.WriteString(targetStyled + "\n")
-				// Add spacing between targets (except for the last one)
+				identifier := formatTargetIdentifier(target)
+
+				// Compute aggregate health — for label_selector targets with no
+				// top-level health, aggregate from nested targets instead.
+				healthStatuses := target.HealthStatus
+				if len(healthStatuses) == 0 && len(target.Targets) > 0 {
+					for _, nested := range target.Targets {
+						healthStatuses = append(healthStatuses, nested.HealthStatus...)
+					}
+				}
+				aggregate := computeAggregateHealth(healthStatuses)
+
+				// First line: identifier + type + health badge
+				targetDesc := fmt.Sprintf("🎯 Target %d: %s (Type: %s)  %s", i+1, identifier, target.Type, renderHealthBadge(aggregate))
+
+				// Second line: per-port health breakdown
+				portHealth := renderPerPortHealth(target.HealthStatus)
+				if portHealth != "" {
+					targetDesc += "\n" + portHealth
+				}
+
+				// Nested targets for label_selector types
+				if len(target.Targets) > 0 {
+					targetDesc += fmt.Sprintf("\n\nTargets (%d):", len(target.Targets))
+					for _, nested := range target.Targets {
+						nestedID := formatTargetIdentifier(nested)
+						nestedAggregate := computeAggregateHealth(nested.HealthStatus)
+						targetDesc += fmt.Sprintf("\n  → %s  %s", nestedID, renderHealthBadge(nestedAggregate))
+						nestedPortHealth := renderPerPortHealth(nested.HealthStatus)
+						if nestedPortHealth != "" {
+							targetDesc += "\n      " + nestedPortHealth
+						}
+					}
+				}
+
+				targetsContent.WriteString(targetStyle.Render(targetDesc) + "\n")
 				if i < len(m.loadbalancerTargets)-1 {
 					targetsContent.WriteString("\n")
 				}
 			}
-			// Wrap all targets in a container
 			targetView.WriteString(targetContainerStyle.Render(targetsContent.String()) + "\n")
 		}
-		// Enhanced help text
 		helpText := "💡 Press 'q' to return to Load Balancer view"
 		targetView.WriteString("\n" + helpStyle.Render(helpText))
 		return targetView.String()
@@ -748,4 +766,119 @@ func formatServerLabels(server *hcloud.Server) []string {
 		lines = append(lines, fmt.Sprintf("• %s=%s", key, server.Labels[key]))
 	}
 	return lines
+}
+
+func formatTargetIdentifier(target hcloud.LoadBalancerTarget) string {
+	switch target.Type {
+	case hcloud.LoadBalancerTargetTypeServer:
+		if target.Server != nil && target.Server.Server != nil {
+			name := target.Server.Server.Name
+			if name != "" {
+				return name
+			}
+			return fmt.Sprintf("Server #%d", target.Server.Server.ID)
+		}
+		return "Server (unknown)"
+	case hcloud.LoadBalancerTargetTypeLabelSelector:
+		if target.LabelSelector != nil {
+			return target.LabelSelector.Selector
+		}
+		return "Label Selector (unknown)"
+	case hcloud.LoadBalancerTargetTypeIP:
+		if target.IP != nil {
+			return target.IP.IP
+		}
+		return "IP (unknown)"
+	default:
+		// Nested targets inside label_selector may have Type="" but still carry server info
+		if target.Server != nil && target.Server.Server != nil {
+			name := target.Server.Server.Name
+			if name != "" {
+				return name
+			}
+			return fmt.Sprintf("Server #%d", target.Server.Server.ID)
+		}
+		if target.IP != nil {
+			return target.IP.IP
+		}
+		return "Target (unknown)"
+	}
+}
+
+func computeAggregateHealth(statuses []hcloud.LoadBalancerTargetHealthStatus) string {
+	if len(statuses) == 0 {
+		return "unknown"
+	}
+	hasHealthy := false
+	hasUnhealthy := false
+	hasUnknown := false
+	for _, s := range statuses {
+		switch s.Status {
+		case hcloud.LoadBalancerTargetHealthStatusStatusHealthy:
+			hasHealthy = true
+		case hcloud.LoadBalancerTargetHealthStatusStatusUnhealthy:
+			hasUnhealthy = true
+		default:
+			hasUnknown = true
+		}
+	}
+	switch {
+	case hasHealthy && !hasUnhealthy && !hasUnknown:
+		return "healthy"
+	case hasUnhealthy && !hasHealthy && !hasUnknown:
+		return "unhealthy"
+	case !hasHealthy && !hasUnhealthy:
+		return "unknown"
+	default:
+		return "mixed"
+	}
+}
+
+func renderHealthBadge(status string) string {
+	switch status {
+	case "healthy":
+		return healthyStyle.Render("● Healthy")
+	case "unhealthy":
+		return unhealthyStyle.Render("● Unhealthy")
+	case "mixed":
+		return mixedHealthStyle.Render("● Mixed")
+	default:
+		return mixedHealthStyle.Render("● Unknown")
+	}
+}
+
+func renderPerPortHealth(statuses []hcloud.LoadBalancerTargetHealthStatus) string {
+	if len(statuses) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(statuses))
+	for _, s := range statuses {
+		var styledStatus string
+		switch s.Status {
+		case hcloud.LoadBalancerTargetHealthStatusStatusHealthy:
+			styledStatus = healthyStyle.Render("Healthy")
+		case hcloud.LoadBalancerTargetHealthStatusStatusUnhealthy:
+			styledStatus = unhealthyStyle.Render("Unhealthy")
+		default:
+			styledStatus = mixedHealthStyle.Render("Unknown")
+		}
+		parts = append(parts, fmt.Sprintf("Port %d: %s", s.ListenPort, styledStatus))
+	}
+	return strings.Join(parts, " | ")
+}
+
+func formatHealthCheck(hc hcloud.LoadBalancerServiceHealthCheck) string {
+	line := fmt.Sprintf("Health Check: %s on port %d | Interval: %s | Timeout: %s | Retries: %d",
+		strings.ToUpper(string(hc.Protocol)), hc.Port, hc.Interval, hc.Timeout, hc.Retries)
+	if hc.HTTP != nil {
+		httpDetail := fmt.Sprintf("Path: %s", hc.HTTP.Path)
+		if hc.HTTP.Domain != "" {
+			httpDetail = fmt.Sprintf("Domain: %s | %s", hc.HTTP.Domain, httpDetail)
+		}
+		if hc.HTTP.TLS {
+			httpDetail += " | TLS: true"
+		}
+		line += "\n" + httpDetail
+	}
+	return line
 }
